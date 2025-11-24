@@ -21,6 +21,16 @@ This library provides a sophisticated masonry layout algorithm with importance-b
 npm install masonry-quilt
 ```
 
+## Live Example
+
+Check out the [React example](./example-react/) with colorful cards and big fonts to see the library in action!
+
+```bash
+cd example-react
+npm install
+npm run dev
+```
+
 ## Basic Usage
 
 ```typescript

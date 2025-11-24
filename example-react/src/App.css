@@ -1,0 +1,182 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell,
+    sans-serif;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  min-height: 100vh;
+}
+
+.app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  padding: 20px;
+}
+
+.header {
+  text-align: center;
+  color: white;
+  margin-bottom: 30px;
+}
+
+.header h1 {
+  font-size: 48px;
+  margin-bottom: 20px;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.stats {
+  display: flex;
+  justify-content: center;
+  gap: 40px;
+  flex-wrap: wrap;
+}
+
+.stat {
+  background: rgba(255, 255, 255, 0.2);
+  backdrop-filter: blur(10px);
+  padding: 12px 24px;
+  border-radius: 12px;
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.stat-label {
+  font-size: 16px;
+  opacity: 0.9;
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: bold;
+}
+
+.masonry-container {
+  flex: 1;
+  background: rgba(255, 255, 255, 0.95);
+  border-radius: 20px;
+  padding: 24px;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+  overflow: auto;
+  max-height: calc(100vh - 300px);
+}
+
+.masonry-grid {
+  display: grid;
+  gap: 16px;
+  grid-auto-flow: dense;
+}
+
+.card {
+  background: #fff;
+  border-radius: 16px;
+  padding: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  transition: all 0.3s ease;
+  cursor: pointer;
+  color: white;
+  text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
+  overflow: hidden;
+  position: relative;
+}
+
+.card:hover {
+  transform: scale(1.05);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+  z-index: 10;
+}
+
+.card-content {
+  text-align: center;
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.card-emoji {
+  line-height: 1.2;
+  word-break: break-word;
+}
+
+.card-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  font-size: 14px;
+  opacity: 0.9;
+}
+
+.card-size {
+  background: rgba(0, 0, 0, 0.2);
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-weight: normal;
+}
+
+.card-importance {
+  background: rgba(255, 255, 255, 0.3);
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-weight: normal;
+}
+
+.card-capped {
+  background: rgba(255, 200, 0, 0.5);
+  padding: 4px 8px;
+  border-radius: 8px;
+  font-weight: normal;
+  font-size: 12px;
+}
+
+.footer {
+  text-align: center;
+  color: white;
+  margin-top: 30px;
+  padding: 20px;
+}
+
+.footer p {
+  font-size: 18px;
+  line-height: 1.6;
+}
+
+.footer small {
+  opacity: 0.8;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .header h1 {
+    font-size: 32px;
+  }
+
+  .stats {
+    gap: 20px;
+  }
+
+  .stat {
+    padding: 8px 16px;
+  }
+
+  .stat-label {
+    font-size: 14px;
+  }
+
+  .stat-value {
+    font-size: 18px;
+  }
+
+  .masonry-container {
+    max-height: calc(100vh - 350px);
+  }
+}

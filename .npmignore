@@ -1,0 +1,27 @@
+# Development files
+node_modules/
+src/
+*.log
+.DS_Store
+*.tsbuildinfo
+coverage/
+.env
+.env.local
+
+# Test files
+**/__tests__/
+*.test.ts
+*.test.tsx
+
+# Build config
+tsconfig.json
+vitest.config.ts
+biome.json
+
+# Examples (not included in package)
+example.ts
+example-react/
+
+# Git files
+.git/
+.gitignore
