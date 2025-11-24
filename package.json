@@ -1,0 +1,45 @@
+{
+  "name": "masonry-quilt",
+  "version": "1.0.0",
+  "description": "A pure TypeScript masonry layout calculator that packs boxes into a given space - no UI, just boxes in and positioning out",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "format": "biome format --write .",
+    "lint": "biome lint .",
+    "check": "biome check .",
+    "prepublishOnly": "npm run build && npm test"
+  },
+  "keywords": [
+    "masonry",
+    "layout",
+    "grid",
+    "packing",
+    "algorithm",
+    "positioning",
+    "box-packing"
+  ],
+  "author": "",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "biome": "^0.3.3",
+    "tsup": "^8.5.1",
+    "typescript": "^5.9.3",
+    "vitest": "^4.0.13"
+  }
+}
