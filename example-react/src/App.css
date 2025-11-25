@@ -26,8 +26,15 @@ body {
 
 .header h1 {
   font-size: 48px;
-  margin-bottom: 20px;
+  margin-bottom: 10px;
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.subtitle {
+  font-size: 18px;
+  margin-bottom: 20px;
+  opacity: 0.95;
+  font-weight: 500;
 }
 
 .stats {
@@ -70,7 +77,8 @@ body {
 .masonry-grid {
   display: grid;
   gap: 16px;
-  grid-auto-flow: dense;
+  width: 100%;
+  /* Smooth grid recalculation - grid itself doesn't animate, but items do */
 }
 
 .card {
@@ -81,12 +89,20 @@ body {
   align-items: center;
   justify-content: center;
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
-  transition: all 0.3s ease;
   cursor: pointer;
   color: white;
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
   overflow: hidden;
   position: relative;
+
+  /* CSS-only smooth animations for position and size changes */
+  transition: grid-column-start 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+    grid-column-end 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+    grid-row-start 0.5s cubic-bezier(0.4, 0, 0.2, 1),
+    grid-row-end 0.5s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease, transform 0.3s ease;
+
+  /* Prevent layout shifts during resize */
+  will-change: grid-column-start, grid-column-end, grid-row-start, grid-row-end;
 }
 
 .card:hover {

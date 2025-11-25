@@ -47,18 +47,20 @@ const sampleItems: LayoutItem[] = [
   { id: "20", importance: 2, content: "🏷️ Tag", type: "text" },
 ];
 
-// Card component with big fonts
+// Card component with big fonts and CSS animations
 function Card({ card, item }: { card: PlacedCard; item: LayoutItem }) {
   const cellWidth = card.width / 4;
   const cellHeight = card.height / 4;
+  const colPosition = card.col / 4;
+  const rowPosition = card.row / 4;
 
   // Calculate responsive font size based on card size
   const area = cellWidth * cellHeight;
   let fontSize = 16;
-  if (area >= 16) fontSize = 48; // 4x4 or larger
-  else if (area >= 9) fontSize = 36; // 3x3
-  else if (area >= 4) fontSize = 28; // 2x2
-  else if (area >= 2) fontSize = 20; // 2x1 or 1x2
+  if (area >= 16) fontSize = 48;
+  else if (area >= 9) fontSize = 36;
+  else if (area >= 4) fontSize = 28;
+  else if (area >= 2) fontSize = 20;
 
   const colors = [
     "#FF6B6B",
@@ -79,8 +81,11 @@ function Card({ card, item }: { card: PlacedCard; item: LayoutItem }) {
     <div
       className="card"
       style={{
-        gridColumn: `span ${cellWidth}`,
-        gridRow: `span ${cellHeight}`,
+        // Use CSS Grid positioning for smooth transitions
+        gridColumnStart: colPosition + 1,
+        gridColumnEnd: colPosition + cellWidth + 1,
+        gridRowStart: rowPosition + 1,
+        gridRowEnd: rowPosition + cellHeight + 1,
         backgroundColor: bgColor,
         fontSize: `${fontSize}px`,
         fontWeight: "bold",
@@ -105,12 +110,13 @@ export default function App() {
   const [layout, setLayout] = useState<PlacedCard[]>([]);
   const [gridDimensions, setGridDimensions] = useState({ cols: 0, rows: 0 });
   const [utilization, setUtilization] = useState(0);
+  const [cellSize] = useState(200);
 
   useEffect(() => {
     if (!containerRef.current) return;
 
     const calculateLayout = (width: number, height: number) => {
-      const result = calculateCardLayout(sampleItems, width, height, 200, "m");
+      const result = calculateCardLayout(sampleItems, width, height, cellSize, "m");
       setLayout(result.placed);
       setGridDimensions(result.grid);
       setUtilization(result.utilization);
@@ -120,16 +126,17 @@ export default function App() {
     const rect = containerRef.current.getBoundingClientRect();
     calculateLayout(rect.width, rect.height);
 
-    // Setup resize observer
+    // Setup resize observer with throttling (150ms debounce)
     const cleanup = createResizeObserver(containerRef.current, calculateLayout, 150);
 
     return cleanup;
-  }, []);
+  }, [cellSize]);
 
   return (
     <div className="app">
       <header className="header">
         <h1>🧩 masonry-quilt React Example</h1>
+        <p className="subtitle">Resize the window to see smooth CSS animations!</p>
         <div className="stats">
           <div className="stat">
             <span className="stat-label">Grid:</span>
@@ -153,7 +160,7 @@ export default function App() {
           className="masonry-grid"
           style={{
             gridTemplateColumns: `repeat(${gridDimensions.cols}, 1fr)`,
-            gridAutoRows: "200px",
+            gridTemplateRows: `repeat(${gridDimensions.rows}, ${cellSize}px)`,
           }}
         >
           {layout.map((card) => {
@@ -165,7 +172,9 @@ export default function App() {
 
       <footer className="footer">
         <p>
-          Resize the window to see the masonry layout adapt! 🎨
+          <strong>Try resizing your window!</strong> 🎨
+          <br />
+          Cards smoothly animate to their new positions with CSS Grid transitions
           <br />
           <small>
             Powered by <strong>masonry-quilt</strong> - Pure TypeScript layout calculator
