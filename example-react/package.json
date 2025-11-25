@@ -9,9 +9,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "framer-motion": "^12.23.24",
+    "masonry-quilt": "file:..",
     "react": "^19.2.0",
-    "react-dom": "^19.2.0",
-    "masonry-quilt": "file:.."
+    "react-dom": "^19.2.0"
   },
   "devDependencies": {
     "@types/react": "^19.2.7",

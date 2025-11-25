@@ -77,8 +77,8 @@ body {
 .masonry-grid {
   display: grid;
   gap: 16px;
+  grid-auto-flow: dense;
   width: 100%;
-  /* Smooth grid recalculation - grid itself doesn't animate, but items do */
 }
 
 .card {
@@ -94,15 +94,8 @@ body {
   text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.2);
   overflow: hidden;
   position: relative;
-
-  /* CSS-only smooth animations for position and size changes */
-  transition: grid-column-start 0.5s cubic-bezier(0.4, 0, 0.2, 1),
-    grid-column-end 0.5s cubic-bezier(0.4, 0, 0.2, 1),
-    grid-row-start 0.5s cubic-bezier(0.4, 0, 0.2, 1),
-    grid-row-end 0.5s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s ease, transform 0.3s ease;
-
-  /* Prevent layout shifts during resize */
-  will-change: grid-column-start, grid-column-end, grid-row-start, grid-row-end;
+  /* Framer Motion handles transitions via layout prop */
+  min-height: 0;
 }
 
 .card:hover {

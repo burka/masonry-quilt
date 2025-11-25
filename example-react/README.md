@@ -5,13 +5,13 @@ A visual demonstration of the **masonry-quilt** library with React, featuring co
 ## Features
 
 - 🎨 Colorful cards with importance-based sizing
-- 📏 Responsive layout that adapts to window resize with **smooth CSS animations**
+- 📏 Responsive layout that adapts to window resize with **smooth Framer Motion animations**
 - 🔤 Big, bold fonts that scale with card size (16-48px)
 - 📊 Real-time statistics (grid size, card count, utilization)
 - ✨ Smooth hover effects and position transitions
 - 🎯 Various card types: text, images, videos, with different aspect ratios
 - ⚡ Throttled resize recalculation (150ms debounce) for performance
-- 🎭 Pure CSS Grid transitions - no animation libraries needed!
+- 🎭 Framer Motion layout animations for smooth, physics-based transitions
 
 ## Running the Example
 
@@ -36,11 +36,11 @@ Then open your browser to the URL shown (usually http://localhost:5173)
 
 ### Animation Details
 
-- **CSS Grid transitions**: Cards use `grid-column-start/end` and `grid-row-start/end` transitions
-- **Cubic bezier easing**: Smooth, natural-feeling motion with `cubic-bezier(0.4, 0, 0.2, 1)`
-- **0.5s duration**: Balanced speed - not too fast, not too slow
-- **No JavaScript animation**: Pure CSS for better performance
-- **Will-change optimization**: Hints to browser for smoother rendering
+- **Framer Motion layout prop**: Automatic layout animations when card positions/sizes change
+- **Spring physics**: Natural, fluid motion with `stiffness: 250, damping: 20`
+- **Entry/exit animations**: Cards fade and scale in/out smoothly
+- **LayoutGroup**: Synchronizes animations across all cards for coordinated transitions
+- **AnimatePresence**: Handles card removal animations gracefully
 
 ## How It Works
 

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { calculateCardLayout, createResizeObserver } from "masonry-quilt";
 import type { LayoutItem, PlacedCard } from "masonry-quilt";
+import { motion, LayoutGroup, AnimatePresence } from "framer-motion";
 import "./App.css";
 
 // Sample data with various importance levels and content
@@ -47,12 +48,10 @@ const sampleItems: LayoutItem[] = [
   { id: "20", importance: 2, content: "🏷️ Tag", type: "text" },
 ];
 
-// Card component with big fonts and CSS animations
+// Card component with big fonts and Framer Motion animations
 function Card({ card, item }: { card: PlacedCard; item: LayoutItem }) {
   const cellWidth = card.width / 4;
   const cellHeight = card.height / 4;
-  const colPosition = card.col / 4;
-  const rowPosition = card.row / 4;
 
   // Calculate responsive font size based on card size
   const area = cellWidth * cellHeight;
@@ -78,14 +77,24 @@ function Card({ card, item }: { card: PlacedCard; item: LayoutItem }) {
   const bgColor = colors[colorIndex];
 
   return (
-    <div
+    <motion.div
+      layout
+      initial={{ opacity: 0, scale: 0.8 }}
+      animate={{ opacity: 1, scale: 1 }}
+      exit={{ opacity: 0, scale: 0.8 }}
+      transition={{
+        layout: {
+          type: "spring",
+          stiffness: 250,
+          damping: 20,
+        },
+        opacity: { duration: 0.3 },
+        scale: { duration: 0.3 },
+      }}
       className="card"
       style={{
-        // Use CSS Grid positioning for smooth transitions
-        gridColumnStart: colPosition + 1,
-        gridColumnEnd: colPosition + cellWidth + 1,
-        gridRowStart: rowPosition + 1,
-        gridRowEnd: rowPosition + cellHeight + 1,
+        gridRow: `span ${cellHeight}`,
+        gridColumn: `span ${cellWidth}`,
         backgroundColor: bgColor,
         fontSize: `${fontSize}px`,
         fontWeight: "bold",
@@ -101,7 +110,7 @@ function Card({ card, item }: { card: PlacedCard; item: LayoutItem }) {
           {card.contentCapped && <div className="card-capped">📏 Capped</div>}
         </div>
       </div>
-    </div>
+    </motion.div>
   );
 }
 
@@ -136,7 +145,7 @@ export default function App() {
     <div className="app">
       <header className="header">
         <h1>🧩 masonry-quilt React Example</h1>
-        <p className="subtitle">Resize the window to see smooth CSS animations!</p>
+        <p className="subtitle">Resize the window to see smooth Framer Motion animations!</p>
         <div className="stats">
           <div className="stat">
             <span className="stat-label">Grid:</span>
@@ -160,13 +169,17 @@ export default function App() {
           className="masonry-grid"
           style={{
             gridTemplateColumns: `repeat(${gridDimensions.cols}, 1fr)`,
-            gridTemplateRows: `repeat(${gridDimensions.rows}, ${cellSize}px)`,
+            gridAutoRows: `${cellSize}px`,
           }}
         >
-          {layout.map((card) => {
-            const item = sampleItems.find((i) => i.id === card.id);
-            return item ? <Card key={card.id} card={card} item={item} /> : null;
-          })}
+          <LayoutGroup>
+            <AnimatePresence mode="popLayout">
+              {layout.map((card) => {
+                const item = sampleItems.find((i) => i.id === card.id);
+                return item ? <Card key={card.id} card={card} item={item} /> : null;
+              })}
+            </AnimatePresence>
+          </LayoutGroup>
         </div>
       </div>
 
@@ -174,7 +187,7 @@ export default function App() {
         <p>
           <strong>Try resizing your window!</strong> 🎨
           <br />
-          Cards smoothly animate to their new positions with CSS Grid transitions
+          Cards smoothly animate to their new positions with Framer Motion
           <br />
           <small>
             Powered by <strong>masonry-quilt</strong> - Pure TypeScript layout calculator
