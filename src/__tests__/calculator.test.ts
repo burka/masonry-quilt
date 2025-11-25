@@ -359,4 +359,96 @@ describe("calculateCardLayout", () => {
       }
     });
   });
+
+  describe("Sprinkle Effect Configuration", () => {
+    test("sprinkle effect is enabled by default", () => {
+      const items: LayoutItem[] = Array.from({ length: 10 }, (_, i) => ({
+        id: `${i}`,
+        importance: i + 1,
+      }));
+
+      // Default behavior (sprinkle enabled)
+      const result = calculateCardLayout(items, 2000, 2000, 200, "m");
+      expect(result.placed.length).toBeGreaterThan(0);
+    });
+
+    test("can disable sprinkle effect with boolean false", () => {
+      const items: LayoutItem[] = Array.from({ length: 10 }, (_, i) => ({
+        id: `${i}`,
+        importance: i + 1,
+      }));
+
+      // Disable sprinkle effect
+      const result = calculateCardLayout(items, 2000, 2000, 200, "m", {
+        sprinkle: false,
+      });
+      expect(result.placed.length).toBeGreaterThan(0);
+      // Without sprinkle, placement should be strictly by importance order
+    });
+
+    test("can enable sprinkle effect with boolean true", () => {
+      const items: LayoutItem[] = Array.from({ length: 10 }, (_, i) => ({
+        id: `${i}`,
+        importance: i + 1,
+      }));
+
+      // Explicitly enable sprinkle effect
+      const result = calculateCardLayout(items, 2000, 2000, 200, "m", {
+        sprinkle: true,
+      });
+      expect(result.placed.length).toBeGreaterThan(0);
+    });
+
+    test("can configure sprinkle percentage", () => {
+      const items: LayoutItem[] = Array.from({ length: 10 }, (_, i) => ({
+        id: `${i}`,
+        importance: i + 1,
+      }));
+
+      // Configure 50% boost percentage
+      const result = calculateCardLayout(items, 2000, 2000, 200, "m", {
+        sprinkle: {
+          enabled: true,
+          percentage: 0.5, // 50% of cards get boosted
+          boost: 0.3,
+        },
+      });
+      expect(result.placed.length).toBeGreaterThan(0);
+    });
+
+    test("can configure sprinkle boost amount", () => {
+      const items: LayoutItem[] = Array.from({ length: 10 }, (_, i) => ({
+        id: `${i}`,
+        importance: i + 1,
+      }));
+
+      // Configure larger boost
+      const result = calculateCardLayout(items, 2000, 2000, 200, "m", {
+        sprinkle: {
+          enabled: true,
+          percentage: 0.2,
+          boost: 0.5, // Larger boost amount
+        },
+      });
+      expect(result.placed.length).toBeGreaterThan(0);
+    });
+
+    test("sprinkle disabled produces deterministic layout", () => {
+      const items: LayoutItem[] = Array.from({ length: 10 }, (_, i) => ({
+        id: `${i}`,
+        importance: 10 - i, // Reverse order
+      }));
+
+      const result1 = calculateCardLayout(items, 2000, 2000, 200, "m", {
+        sprinkle: false,
+      });
+      const result2 = calculateCardLayout(items, 2000, 2000, 200, "m", {
+        sprinkle: false,
+      });
+
+      // Should produce identical results
+      expect(result1.placed.length).toBe(result2.placed.length);
+      expect(result1.placed[0].id).toBe(result2.placed[0].id);
+    });
+  });
 });

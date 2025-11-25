@@ -57,7 +57,7 @@ console.log(result.utilization); // Space utilization percentage
 
 ## API
 
-### calculateCardLayout(items, viewportWidth, viewportHeight, cellSize, gapSize)
+### calculateCardLayout(items, viewportWidth, viewportHeight, cellSize, gapSize, options?)
 
 Calculate masonry layout for given items and viewport.
 
@@ -68,6 +68,7 @@ Calculate masonry layout for given items and viewport.
 - `viewportHeight: number` - Available height in pixels
 - `cellSize: number` - Size of one cell in pixels (e.g., 200px means 2x2 card = 400px)
 - `gapSize: "s" | "m" | "l"` - Gap between items (s=8px, m=16px, l=24px)
+- `options?: LayoutOptions` - Optional layout configuration
 
 **Returns:** `LayoutResult`
 
@@ -113,6 +114,41 @@ interface PlacedCard {
 ```
 
 ## Advanced Examples
+
+### Configuring the Sprinkle Effect
+
+By default, the library uses a "sprinkle effect" that randomly boosts ~20% of lower-importance cards for visual variety. You can configure or disable this:
+
+```typescript
+// Disable sprinkle effect completely (strict importance ordering)
+const result = calculateCardLayout(items, 1920, 1080, 200, "m", {
+  sprinkle: false,
+});
+
+// Enable with default settings (20% boost by 0.3)
+const result = calculateCardLayout(items, 1920, 1080, 200, "m", {
+  sprinkle: true,
+});
+
+// Custom configuration
+const result = calculateCardLayout(items, 1920, 1080, 200, "m", {
+  sprinkle: {
+    enabled: true,
+    percentage: 0.3, // 30% of cards get boosted
+    boost: 0.4, // Boost percentile by 0.4 (40%)
+  },
+});
+```
+
+**When to disable:**
+- When you need strict importance-based ordering
+- For predictable, non-randomized layouts
+- When building galleries with exact order requirements
+
+**When to enable:**
+- For visually interesting, varied layouts (default)
+- To prevent monotonous size patterns
+- When order flexibility is acceptable
 
 ### Content-Aware Sizing
 

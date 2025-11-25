@@ -4,6 +4,7 @@ import type {
   AvailableSpace,
   LayoutResult,
   GapSize,
+  LayoutOptions,
 } from "./types";
 
 // Gap sizes in pixels
@@ -323,6 +324,7 @@ function findAvailableSpaces(
  * @param viewportHeight - Available height in pixels
  * @param cellSize - Size of one cell in pixels (e.g., 200px)
  * @param gapSize - Gap between items ("s" = 8px, "m" = 16px, "l" = 24px)
+ * @param options - Optional layout configuration
  * @returns Layout result with placed cards and metadata
  */
 export function calculateCardLayout(
@@ -331,6 +333,7 @@ export function calculateCardLayout(
   viewportHeight: number,
   cellSize: number,
   gapSize: GapSize,
+  options?: LayoutOptions,
 ): LayoutResult {
   const gap = GAP_SIZES[gapSize];
 
@@ -364,6 +367,16 @@ export function calculateCardLayout(
   const gridCols = gridColsInCells * 4;
   const gridRows = gridRowsInCells * 4;
 
+  // Parse sprinkle options
+  const sprinkleConfig =
+    typeof options?.sprinkle === "boolean"
+      ? { enabled: options.sprinkle, percentage: 0.2, boost: 0.3 }
+      : {
+          enabled: options?.sprinkle?.enabled ?? true,
+          percentage: options?.sprinkle?.percentage ?? 0.2,
+          boost: options?.sprinkle?.boost ?? 0.3,
+        };
+
   // Use RANK-based percentiles for even distribution
   const sorted = [...items].sort((a, b) => b.importance - a.importance);
   const itemsWithPercentile = sorted.map((item, index) => ({
@@ -371,17 +384,34 @@ export function calculateCardLayout(
     percentile: 1 - index / Math.max(sorted.length - 1, 1),
   }));
 
-  // SPRINKLE EFFECT: Give random 20% of low-importance cards a boost
-  const [topItem, ...restItems] = itemsWithPercentile;
-  const boostedItems = restItems.map((item) => {
-    const hash = hashString(item.id);
-    const shouldBoost = hash % 10 > 8;
-    const boostedPercentile = shouldBoost ? Math.min(0.95, item.percentile + 0.3) : item.percentile;
-    return { ...item, placementPercentile: boostedPercentile };
-  });
+  // SPRINKLE EFFECT: Optionally give random percentage of low-importance cards a boost
+  // This creates visual variety by occasionally placing smaller items near the top
+  let placementOrder: typeof itemsWithPercentile;
 
-  const sortedRest = boostedItems.sort((a, b) => b.placementPercentile - a.placementPercentile);
-  const placementOrder = topItem ? [topItem, ...sortedRest] : sortedRest;
+  if (sprinkleConfig.enabled && itemsWithPercentile.length > 1) {
+    const [topItem, ...restItems] = itemsWithPercentile;
+
+    // Calculate threshold from percentage (e.g., 0.2 = 20% = hash % 10 > 8)
+    const threshold = Math.floor((1 - sprinkleConfig.percentage) * 10);
+
+    const boostedItems = restItems.map((item) => {
+      const hash = hashString(item.id);
+      const shouldBoost = hash % 10 > threshold - 1;
+      const boostedPercentile = shouldBoost
+        ? Math.min(0.95, item.percentile + sprinkleConfig.boost)
+        : item.percentile;
+      return { ...item, placementPercentile: boostedPercentile };
+    });
+
+    const sortedRest = boostedItems.sort((a, b) => b.placementPercentile - a.placementPercentile);
+    placementOrder = topItem ? [topItem, ...sortedRest] : sortedRest;
+  } else {
+    // No sprinkle effect - use original percentile order
+    placementOrder = itemsWithPercentile.map((item) => ({
+      ...item,
+      placementPercentile: item.percentile,
+    }));
+  }
 
   // Column-based masonry algorithm
   const columnHeights: number[] = Array(gridCols).fill(0);

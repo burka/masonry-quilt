@@ -82,3 +82,25 @@ export interface LayoutResult {
  * Gap size options
  */
 export type GapSize = "s" | "m" | "l";
+
+/**
+ * Layout options for fine-tuning the masonry algorithm
+ */
+export interface LayoutOptions {
+  /**
+   * Sprinkle effect configuration - randomly boosts some low-importance cards
+   * for visual variety. Set to false to disable, or configure the boost behavior.
+   *
+   * @default { enabled: true, percentage: 0.2, boost: 0.3 }
+   */
+  sprinkle?:
+    | boolean
+    | {
+        /** Enable/disable the sprinkle effect */
+        enabled: boolean;
+        /** Percentage of cards to boost (0-1 range, e.g., 0.2 = 20%) */
+        percentage?: number;
+        /** Amount to boost percentile by (0-1 range, e.g., 0.3 = 30% boost) */
+        boost?: number;
+      };
+}

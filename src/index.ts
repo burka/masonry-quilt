@@ -14,5 +14,6 @@ export type {
   AvailableSpace,
   LayoutResult,
   GapSize,
+  LayoutOptions,
 } from "./types";
 export { createResizeObserver, createScrollOptimizer } from "./helpers";
