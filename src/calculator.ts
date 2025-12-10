@@ -1,9 +1,4 @@
-import type {
-  LayoutItem,
-  PlacedCard,
-  LayoutResult,
-  LayoutOptions,
-} from "./types";
+import type { LayoutItem, LayoutOptions, LayoutResult, PlacedCard } from "./types";
 
 // Ratio shortcuts - these are implicitly loose (can flex the ratio if needed)
 const RATIO_SHORTCUTS: Record<string, string> = {
@@ -90,7 +85,10 @@ function calculateCardSize<T extends LayoutItem>(
   // Check if card fits in grid
   if (width > gridCols || height > gridRows) {
     // If loose ratio, scale down to fit
-    if (item.format?.loose !== false && (!item.format?.ratio || RATIO_SHORTCUTS[item.format.ratio as string])) {
+    if (
+      item.format?.loose !== false &&
+      (!item.format?.ratio || RATIO_SHORTCUTS[item.format.ratio as string])
+    ) {
       const scaleX = gridCols / width;
       const scaleY = gridRows / height;
       const scale = Math.min(scaleX, scaleY);
@@ -201,13 +199,11 @@ function markRegion(
 
 /**
  * PHASE 1: Place each item in shortest column using masonry algorithm
- * Items can only move ±maxDisplacement positions from their original order
  */
 function placeItemsInColumns<T extends LayoutItem>(
   indexedItems: IndexedItem<T>[],
   ctx: LayoutContext<T>,
   baseSize: number,
-  maxDisplacement: number,
 ): number[] {
   const { gridCols, gridRows, occupied, placed } = ctx;
   const columnHeights: number[] = Array(gridCols).fill(0);
@@ -266,18 +262,16 @@ function placeItemsInColumns<T extends LayoutItem>(
 
 /**
  * PHASE 2: Try to place unplaced items in available gaps
- * Respects looseness constraint - items can only move ±maxDisplacement positions
  */
 function fillGaps<T extends LayoutItem>(
   indexedItems: IndexedItem<T>[],
   unplacedIndices: number[],
   ctx: LayoutContext<T>,
   baseSize: number,
-  maxDisplacement: number,
 ): void {
   const { gridCols, gridRows, occupied, placed } = ctx;
 
-  const unplacedItems = unplacedIndices.map(i => indexedItems[i]);
+  const unplacedItems = unplacedIndices.map((i) => indexedItems[i]);
 
   // Sort by size (smaller first) to fit into gaps
   unplacedItems.sort((a, b) => {
@@ -306,7 +300,15 @@ function fillGaps<T extends LayoutItem>(
           col: position.col,
         });
 
-        markRegion(occupied, position.row, position.col, size.width, size.height, gridRows, gridCols);
+        markRegion(
+          occupied,
+          position.row,
+          position.col,
+          size.width,
+          size.height,
+          gridRows,
+          gridCols,
+        );
         placedCard = true;
         break;
       }
@@ -413,7 +415,15 @@ function expandHorizontally<T extends LayoutItem>(
       }
 
       const expandWidth = gridCols - rightCol;
-      markRegion(occupied, card.row, rightCol, expandWidth, card.height, actualGridRowsInUnits, gridCols);
+      markRegion(
+        occupied,
+        card.row,
+        rightCol,
+        expandWidth,
+        card.height,
+        actualGridRowsInUnits,
+        gridCols,
+      );
       card.width = gridCols - card.col;
     }
   }
@@ -438,10 +448,9 @@ export function calculateLayout<T extends LayoutItem>(
 ): LayoutResult<T> {
   const baseSize = options?.baseSize ?? 200;
   const gap = options?.gap ?? 16;
-  const looseness = options?.looseness ?? 0.2;
   const includeGrid = options?.includeGrid ?? false;
 
-  // Wrap items with original index for displacement tracking (preserves original reference)
+  // Wrap items with original index for order fidelity tracking
   const indexedItems: IndexedItem<T>[] = items.map((item, index) => ({
     item,
     originalIndex: index,
@@ -468,19 +477,16 @@ export function calculateLayout<T extends LayoutItem>(
   const gridCols = gridColsInCells * 4;
   const gridRows = gridRowsInCells * 4;
 
-  // Calculate maximum displacement based on looseness
-  const maxDisplacement = Math.floor(looseness * items.length);
-
   // Initialize layout context
   const placed: InternalPlacedCard<T>[] = [];
   const occupied: boolean[][] = Array.from({ length: gridRows }, () => Array(gridCols).fill(false));
   const ctx: LayoutContext<T> = { gridCols, gridRows, occupied, placed };
 
   // PHASE 1: Place items in columns
-  const unplacedIndices = placeItemsInColumns(indexedItems, ctx, baseSize, maxDisplacement);
+  const unplacedIndices = placeItemsInColumns(indexedItems, ctx, baseSize);
 
   // PHASE 2: Fill gaps with unplaced items (grows grid if needed)
-  fillGaps(indexedItems, unplacedIndices, ctx, baseSize, maxDisplacement);
+  fillGaps(indexedItems, unplacedIndices, ctx, baseSize);
 
   // Calculate actual grid height and utilization
   const maxRowUsed = placed.reduce((max, card) => Math.max(max, card.row + card.height), 0);
@@ -509,7 +515,7 @@ export function calculateLayout<T extends LayoutItem>(
   // Calculate final utilization
   const finalTotalCells = gridCols * actualGridRowsInUnits;
   const usedCells = placed.reduce((sum, card) => sum + card.width * card.height, 0);
-  const utilization = finalTotalCells > 0 ? (usedCells / finalTotalCells) : 0;
+  const utilization = finalTotalCells > 0 ? usedCells / finalTotalCells : 0;
 
   // Calculate order fidelity
   let maxActualDisplacement = 0;
@@ -524,10 +530,10 @@ export function calculateLayout<T extends LayoutItem>(
     maxActualDisplacement = Math.max(maxActualDisplacement, displacement);
   }
 
-  const orderFidelity = items.length > 0 ? 1 - (maxActualDisplacement / items.length) : 1;
+  const orderFidelity = items.length > 0 ? 1 - maxActualDisplacement / items.length : 1;
 
   // Convert internal units to pixels
-  const cards: PlacedCard<T>[] = placed.map(card => {
+  const cards: PlacedCard<T>[] = placed.map((card) => {
     const placedCard: PlacedCard<T> = {
       item: card.item,
       x: (card.col * (baseSize + gap)) / 4,

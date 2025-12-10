@@ -5,7 +5,7 @@
 /**
  * Debounce function for optimizing resize/scroll events
  */
-function debounce<T extends (...args: any[]) => void>(
+function debounce<T extends (...args: unknown[]) => void>(
   func: T,
   wait: number,
 ): (...args: Parameters<T>) => void {

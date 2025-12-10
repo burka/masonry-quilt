@@ -7,10 +7,10 @@
  */
 
 export { calculateLayout } from "./calculator";
+export { createResizeObserver, createScrollOptimizer } from "./helpers";
 export type {
   LayoutItem,
-  PlacedCard,
-  LayoutResult,
   LayoutOptions,
+  LayoutResult,
+  PlacedCard,
 } from "./types";
-export { createResizeObserver, createScrollOptimizer } from "./helpers";

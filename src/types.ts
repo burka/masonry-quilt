@@ -68,8 +68,6 @@ export interface LayoutOptions {
   baseSize?: number;
   /** Gap between items in pixels (default: 16) */
   gap?: number;
-  /** Order flexibility 0-1 (default: 0.2). 0=strict order, 1=any movement allowed */
-  looseness?: number;
   /** Include grid positioning data for CSS Grid usage (default: false) */
   includeGrid?: boolean;
 }

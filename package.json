@@ -33,8 +33,16 @@
     "positioning",
     "box-packing"
   ],
-  "author": "",
+  "author": "burka",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/burka/masonry-quilt.git"
+  },
+  "bugs": {
+    "url": "https://github.com/burka/masonry-quilt/issues"
+  },
+  "homepage": "https://github.com/burka/masonry-quilt#readme",
   "engines": {
     "node": ">=20"
   },

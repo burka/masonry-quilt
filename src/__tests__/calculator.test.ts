@@ -1,4 +1,4 @@
-import { describe, test, expect } from "vitest";
+import { describe, expect, test } from "vitest";
 import { calculateLayout } from "../calculator";
 import type { LayoutItem } from "../types";
 
@@ -227,9 +227,7 @@ describe("calculateLayout", () => {
     });
 
     test("ratio '4:3' with loose: true allows flexibility", () => {
-      const items: TestItem[] = [
-        { id: "1", format: { ratio: "4:3", loose: true } },
-      ];
+      const items: TestItem[] = [{ id: "1", format: { ratio: "4:3", loose: true } }];
       const result = calculateLayout(items, 2000, 2000);
 
       const placed = result.cards.find((c) => c.item.id === "1");
@@ -264,9 +262,7 @@ describe("calculateLayout", () => {
 
   describe("Format: loose behavior", () => {
     test("loose: false enforces strict ratio", () => {
-      const items: TestItem[] = [
-        { id: "1", format: { ratio: "2:1", loose: false } },
-      ];
+      const items: TestItem[] = [{ id: "1", format: { ratio: "2:1", loose: false } }];
       const result = calculateLayout(items, 2000, 2000);
 
       const placed = result.cards.find((c) => c.item.id === "1");
@@ -275,9 +271,7 @@ describe("calculateLayout", () => {
     });
 
     test("loose: true allows ratio flexibility", () => {
-      const items: TestItem[] = [
-        { id: "1", format: { ratio: "2:1", loose: true } },
-      ];
+      const items: TestItem[] = [{ id: "1", format: { ratio: "2:1", loose: true } }];
       const result = calculateLayout(items, 2000, 2000);
 
       const placed = result.cards.find((c) => c.item.id === "1");
@@ -288,17 +282,11 @@ describe("calculateLayout", () => {
 
   describe("Placement Algorithm", () => {
     test("places all items in input order by default", () => {
-      const items: TestItem[] = [
-        { id: "1" },
-        { id: "2" },
-        { id: "3" },
-        { id: "4" },
-        { id: "5" },
-      ];
+      const items: TestItem[] = [{ id: "1" }, { id: "2" }, { id: "3" }, { id: "4" }, { id: "5" }];
       const result = calculateLayout(items, 2000, 1000);
 
       expect(result.cards).toHaveLength(5);
-      // Default looseness should try to preserve order
+      // Algorithm preserves order
       expect(result.cards[0].item.id).toBe("1");
     });
 
@@ -347,26 +335,20 @@ describe("calculateLayout", () => {
 
   describe("Order Fidelity", () => {
     test("orderFidelity is a number between 0 and 1", () => {
-      const items: TestItem[] = [
-        { id: "1" },
-        { id: "2" },
-        { id: "3" },
-        { id: "4" },
-        { id: "5" },
-      ];
+      const items: TestItem[] = [{ id: "1" }, { id: "2" }, { id: "3" }, { id: "4" }, { id: "5" }];
       const result = calculateLayout(items, 2000, 1500);
 
       expect(result.orderFidelity).toBeGreaterThanOrEqual(0);
       expect(result.orderFidelity).toBeLessThanOrEqual(1);
     });
 
-    test("looseness: 0 maximizes order fidelity", () => {
+    test("preserves order with high fidelity", () => {
       const items: TestItem[] = Array.from({ length: 20 }, (_, i) => ({
         id: `${i}`,
       }));
-      const result = calculateLayout(items, 2000, 2000, { looseness: 0 });
+      const result = calculateLayout(items, 2000, 2000);
 
-      // With looseness 0, order should be strictly preserved
+      // Order should be well preserved
       expect(result.orderFidelity).toBeGreaterThan(0.9);
 
       // Verify items are in original order
@@ -377,42 +359,15 @@ describe("calculateLayout", () => {
       }
     });
 
-    test("looseness: 1 allows full reordering", () => {
-      const items: TestItem[] = Array.from({ length: 20 }, (_, i) => ({
-        id: `${i}`,
-        format: {
-          size: {
-            width: 100 + Math.random() * 300,
-            height: 100 + Math.random() * 300,
-          },
-        },
-      }));
-      const result = calculateLayout(items, 2000, 2000, { looseness: 1 });
-
-      expect(result.orderFidelity).toBeGreaterThanOrEqual(0);
-      expect(result.orderFidelity).toBeLessThanOrEqual(1);
-      // With looseness 1, items may be heavily reordered for better packing
-    });
-
-    test("default looseness (0.2) balances order and packing", () => {
+    test("maintains reasonable order fidelity with varied sizes", () => {
       const items: TestItem[] = Array.from({ length: 15 }, (_, i) => ({
         id: `${i}`,
       }));
       const result = calculateLayout(items, 2000, 1500);
 
-      // Default should maintain reasonable order fidelity
+      // Should maintain reasonable order fidelity
       expect(result.orderFidelity).toBeGreaterThan(0.5);
       expect(result.utilization).toBeGreaterThan(0.5);
-    });
-
-    test("custom looseness: 0.5 moderate reordering", () => {
-      const items: TestItem[] = Array.from({ length: 20 }, (_, i) => ({
-        id: `${i}`,
-      }));
-      const result = calculateLayout(items, 2000, 2000, { looseness: 0.5 });
-
-      expect(result.orderFidelity).toBeGreaterThanOrEqual(0);
-      expect(result.orderFidelity).toBeLessThanOrEqual(1);
     });
   });
 
@@ -433,26 +388,6 @@ describe("calculateLayout", () => {
 
       // Should achieve at least 65% utilization
       expect(result.utilization).toBeGreaterThan(0.65);
-    });
-
-    test("higher looseness improves utilization", () => {
-      const items: TestItem[] = Array.from({ length: 20 }, (_, i) => ({
-        id: `${i}`,
-        format: {
-          size: {
-            width: 150 + Math.random() * 200,
-            height: 150 + Math.random() * 200,
-          },
-        },
-      }));
-
-      const strictResult = calculateLayout(items, 2000, 2000, { looseness: 0 });
-      const looseResult = calculateLayout(items, 2000, 2000, { looseness: 1 });
-
-      // Loose packing should generally achieve better utilization
-      expect(looseResult.utilization).toBeGreaterThanOrEqual(
-        strictResult.utilization - 0.1
-      );
     });
 
     test("empty items array has 0 utilization", () => {
@@ -495,9 +430,7 @@ describe("calculateLayout", () => {
     });
 
     test("grid spans are positive numbers", () => {
-      const items: TestItem[] = [
-        { id: "1", format: { minSize: { width: 400, height: 300 } } },
-      ];
+      const items: TestItem[] = [{ id: "1", format: { minSize: { width: 400, height: 300 } } }];
       const result = calculateLayout(items, 2000, 1500, {
         includeGrid: true,
         baseSize: 100,
@@ -684,6 +617,102 @@ describe("calculateLayout", () => {
         expect(card.item).toBeDefined();
       });
     });
+
+    test("handles items that require grid growth", () => {
+      // Many large items that will exceed initial grid estimation
+      const items: TestItem[] = Array.from({ length: 50 }, (_, i) => ({
+        id: `${i}`,
+        format: { minSize: { width: 400, height: 400 } },
+      }));
+      const result = calculateLayout(items, 800, 400); // Small container
+
+      expect(result.cards).toHaveLength(50);
+      // Grid should have grown to accommodate all items
+      expect(result.height).toBeGreaterThan(400);
+    });
+
+    test("handles items with strict ratio that cannot fit", () => {
+      // Item with strict ratio in a container that cannot accommodate it
+      const items: TestItem[] = [{ id: "1", format: { ratio: "16:9", loose: false } }, { id: "2" }];
+      const result = calculateLayout(items, 2000, 2000);
+
+      // Both items should be placed
+      expect(result.cards.length).toBeGreaterThanOrEqual(1);
+    });
+
+    test("handles many items requiring gap filling phase", () => {
+      // Create items with varied sizes to trigger gap filling
+      const items: TestItem[] = [
+        { id: "1", format: { size: { width: 600, height: 600 } } },
+        { id: "2", format: { size: { width: 200, height: 200 } } },
+        { id: "3", format: { size: { width: 300, height: 300 } } },
+        { id: "4", format: { size: { width: 150, height: 150 } } },
+        { id: "5", format: { size: { width: 250, height: 250 } } },
+        { id: "6", format: { size: { width: 100, height: 100 } } },
+        { id: "7", format: { size: { width: 350, height: 350 } } },
+        { id: "8", format: { size: { width: 175, height: 175 } } },
+      ];
+      const result = calculateLayout(items, 1000, 500);
+
+      expect(result.cards).toHaveLength(8);
+      expect(result.utilization).toBeGreaterThan(0);
+    });
+
+    test("items that need to shrink to fit in grid", () => {
+      // Item larger than grid that needs to scale down
+      const items: TestItem[] = [
+        { id: "1", format: { ratio: "portrait" } }, // Shortcuts are loose, can scale
+      ];
+      const result = calculateLayout(items, 300, 300, { baseSize: 100 });
+
+      expect(result.cards).toHaveLength(1);
+      expect(result.cards[0].width).toBeLessThanOrEqual(300);
+      expect(result.cards[0].height).toBeLessThanOrEqual(300);
+    });
+
+    test("items requiring retry with smaller sizes", () => {
+      // Items that can't fit initially but can be resized
+      const items: TestItem[] = Array.from({ length: 20 }, (_, i) => ({
+        id: `${i}`,
+      }));
+      // Very constrained space
+      const result = calculateLayout(items, 600, 200, { baseSize: 150, gap: 8 });
+
+      // All items should eventually be placed
+      expect(result.cards).toHaveLength(20);
+    });
+
+    test("forces grid expansion when items overflow initial estimate", () => {
+      // Create scenario where items definitely won't fit in initial grid
+      // Use very tall items in a short viewport to force grid growth
+      const items: TestItem[] = Array.from({ length: 30 }, (_, i) => ({
+        id: `${i}`,
+        format: { minSize: { width: 300, height: 500 } },
+      }));
+      // Small viewport that will need expansion
+      const result = calculateLayout(items, 1000, 200, { baseSize: 100, gap: 8 });
+
+      expect(result.cards).toHaveLength(30);
+      // Height must have expanded beyond initial viewport
+      expect(result.height).toBeGreaterThan(200);
+    });
+
+    test("handles cards that fail placement and need grid growth in gap filling", () => {
+      // Large items that won't fit in initial placement and need gap filling with grid growth
+      const items: TestItem[] = [
+        // First item takes up most of the space
+        { id: "big", format: { size: { width: 800, height: 600 } } },
+        // More items that will likely need gap filling with grid growth
+        { id: "medium1", format: { size: { width: 400, height: 400 } } },
+        { id: "medium2", format: { size: { width: 400, height: 400 } } },
+        { id: "medium3", format: { size: { width: 400, height: 400 } } },
+      ];
+      // Constrained container
+      const result = calculateLayout(items, 900, 300, { baseSize: 200, gap: 10 });
+
+      // All items should be placed
+      expect(result.cards).toHaveLength(4);
+    });
   });
 
   describe("Performance", () => {
@@ -746,16 +775,6 @@ describe("calculateLayout", () => {
       console.log(`100 items with complex formats: ${duration.toFixed(2)}ms`);
     });
 
-    test("performance with high looseness", () => {
-      const items = generateItems(500);
-      const start = performance.now();
-      const result = calculateLayout(items, 4000, 8000, { looseness: 1 });
-      const duration = performance.now() - start;
-
-      expect(result.cards).toHaveLength(500);
-      console.log(`500 items with looseness=1: ${duration.toFixed(2)}ms`);
-    });
-
     test("performance with grid data enabled", () => {
       const items = generateItems(200);
       const start = performance.now();
@@ -780,9 +799,9 @@ describe("calculateLayout", () => {
         { id: "third" },
         { id: "fourth" },
       ];
-      const result = calculateLayout(items, 2000, 1500, { looseness: 0 });
+      const result = calculateLayout(items, 2000, 1500);
 
-      // With looseness 0, order should be strictly preserved
+      // Order should be strictly preserved
       expect(result.cards[0].item.id).toBe("first");
       expect(result.cards[1].item.id).toBe("second");
       expect(result.cards[2].item.id).toBe("third");
@@ -810,14 +829,16 @@ describe("calculateLayout", () => {
         { id: "square", format: { ratio: "1:1" } },
         { id: "portrait", format: { ratio: "portrait", loose: true } },
         { id: "landscape", format: { ratio: "landscape" } },
-        { id: "constrained", format: { minSize: { width: 200, height: 150 }, maxSize: { width: 600, height: 450 } } },
+        {
+          id: "constrained",
+          format: { minSize: { width: 200, height: 150 }, maxSize: { width: 600, height: 450 } },
+        },
         ...Array.from({ length: 10 }, (_, i) => ({ id: `card-${i}` })),
       ];
 
       const result = calculateLayout(items, 3000, 3000, {
         baseSize: 200,
         gap: 16,
-        looseness: 0.3,
         includeGrid: true,
       });
 
@@ -859,14 +880,12 @@ describe("calculateLayout", () => {
     test("all options can be customized together", () => {
       const items: TestItem[] = Array.from({ length: 15 }, (_, i) => ({
         id: `${i}`,
-        format:
-          i % 3 === 0 ? { ratio: "16:9" } : i % 3 === 1 ? { ratio: "1:1" } : {},
+        format: i % 3 === 0 ? { ratio: "16:9" } : i % 3 === 1 ? { ratio: "1:1" } : {},
       }));
 
       const result = calculateLayout(items, 2400, 1800, {
         baseSize: 250,
         gap: 20,
-        looseness: 0.6,
         includeGrid: true,
       });
 

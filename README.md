@@ -7,7 +7,6 @@ Give it items in your preferred order, get back pixel coordinates ready to rende
 ## Features
 
 - **Order-preserving** — Items placed in your input order
-- **Flexible packing** — Configure how much items can move to fill gaps
 - **All pixels** — Input and output in pixels, no unit conversion needed
 - **Type-safe** — Generics preserve your item types
 - **Zero dependencies** — Lightweight and fast
@@ -67,7 +66,6 @@ The `extends LayoutItem` gives you IDE autocomplete for `format` options while p
 |--------|------|---------|-------------|
 | `baseSize` | number | 200 | Default item size in pixels. Items without explicit size will be approximately `baseSize × baseSize`. |
 | `gap` | number | 16 | Gap between items in pixels. |
-| `looseness` | number | 0.2 | How much items can move from their input position to fill gaps. `0` = strict order, `1` = any movement allowed. |
 | `includeGrid` | boolean | false | Include grid positioning data for CSS Grid usage. |
 
 ### Item Format
@@ -265,21 +263,6 @@ const items = [
 const result = calculateLayout(items, 1200, 800);
 ```
 
-### Order vs Packing
-
-```typescript
-// Strict order — items stay in sequence, may leave gaps
-const strict = calculateLayout(items, 1200, 800, { looseness: 0 });
-console.log(strict.orderFidelity);  // 1.0 (perfect order)
-
-// Balanced — items can move ±20% to fill gaps (default)
-const balanced = calculateLayout(items, 1200, 800, { looseness: 0.2 });
-
-// Loose — items can move anywhere for best packing
-const loose = calculateLayout(items, 1200, 800, { looseness: 1 });
-console.log(loose.orderFidelity);  // e.g., 0.7 (some reordering occurred)
-```
-
 ### Gap and Base Size
 
 ```typescript
@@ -348,7 +331,7 @@ cleanup();
 ## How It Works
 
 1. **Sequential placement** — Items placed in input order into shortest column
-2. **Gap filling** — Within `looseness` limit, items can move to fill gaps
+2. **Gap filling** — Unplaced items fill available gaps
 3. **Expansion** — Cards scale up to fill empty space when utilization is low
 
 ## Performance
