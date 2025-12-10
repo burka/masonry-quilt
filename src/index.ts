@@ -1,19 +1,16 @@
 /**
  * masonry-quilt - Pure TypeScript masonry layout calculator
  *
- * Packs boxes into a given space with importance-based sizing.
- * No UI dependencies - just boxes in, positioning out.
+ * Items in, pixel positions out. No DOM, no UI framework dependencies.
  *
  * @packageDocumentation
  */
 
-export { calculateCardLayout } from "./calculator";
+export { calculateLayout } from "./calculator";
 export type {
   LayoutItem,
   PlacedCard,
-  AvailableSpace,
   LayoutResult,
-  GapSize,
   LayoutOptions,
 } from "./types";
 export { createResizeObserver, createScrollOptimizer } from "./helpers";

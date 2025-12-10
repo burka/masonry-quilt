@@ -1,80 +1,52 @@
 import { useState, useEffect, useRef } from "react";
-import { calculateCardLayout, createResizeObserver } from "masonry-quilt";
+import { calculateLayout, createResizeObserver } from "masonry-quilt";
 import type { LayoutItem, PlacedCard } from "masonry-quilt";
 import { motion, LayoutGroup, AnimatePresence } from "framer-motion";
 import "./App.css";
 
-// Sample data with various importance levels and content
-const sampleItems: LayoutItem[] = [
-  { id: "1", importance: 10, content: "🎯 Most Important", type: "text" },
-  { id: "2", importance: 9, content: "🔥 Very High Priority", type: "text" },
-  { id: "3", importance: 8, content: "⭐ High Priority", type: "text" },
-  {
-    id: "4",
-    importance: 7,
-    content: "📸 Image Card",
-    type: "image",
-  },
-  { id: "5", importance: 6, content: "🎬 Video Card", type: "video" },
-  { id: "6", importance: 5, content: "💡 Medium", type: "text" },
-  { id: "7", importance: 4, content: "📝 Note", type: "text" },
-  { id: "8", importance: 3, content: "✅ Task", type: "text" },
-  { id: "9", importance: 2, content: "📋 List", type: "text" },
-  { id: "10", importance: 1, content: "🗒️ Small", type: "text" },
-  {
-    id: "11",
-    importance: 8,
-    content: "🎨 Wide Banner",
-    format: { ratio: "banner", strict: true },
-  },
-  {
-    id: "12",
-    importance: 7,
-    content: "📱 Portrait",
-    format: { ratio: "portrait", strict: true },
-  },
-  { id: "13", importance: 6, content: "🌟 Regular Card", type: "text" },
-  { id: "14", importance: 5, content: "🎵 Audio", type: "audio" },
-  { id: "15", importance: 4, content: "📄 Document", type: "document" },
-  { id: "16", importance: 9, content: "🚀 Launch Ready", type: "text" },
-  {
-    id: "17",
-    importance: 8,
-    content: "📊 Dashboard",
-    format: { ratio: "landscape", strict: false },
-  },
-  { id: "18", importance: 7, content: "🎮 Game", type: "text" },
-  { id: "19", importance: 3, content: "💬 Comment", type: "text" },
-  { id: "20", importance: 2, content: "🏷️ Tag", type: "text" },
+// Custom interface extending LayoutItem
+interface CardItem extends LayoutItem {
+  id: string;
+  emoji: string;
+  color: string;
+}
+
+// Sample data - items are now placed in INPUT ORDER
+const sampleItems: CardItem[] = [
+  { id: "1", emoji: "🎯", color: "#FF6B6B" },
+  { id: "2", emoji: "🔥", color: "#4ECDC4" },
+  { id: "3", emoji: "⭐", color: "#45B7D1" },
+  { id: "4", emoji: "📸", color: "#FFA07A", format: { ratio: "landscape" } },
+  { id: "5", emoji: "🎬", color: "#98D8C8", format: { ratio: "16:9" } },
+  { id: "6", emoji: "💡", color: "#F7DC6F" },
+  { id: "7", emoji: "📝", color: "#BB8FCE" },
+  { id: "8", emoji: "✅", color: "#85C1E2" },
+  { id: "9", emoji: "📋", color: "#F8B195" },
+  { id: "10", emoji: "🗒️", color: "#C06C84" },
+  { id: "11", emoji: "🎨", color: "#E74C3C", format: { ratio: "banner" } },
+  { id: "12", emoji: "📱", color: "#3498DB", format: { ratio: "portrait" } },
+  { id: "13", emoji: "🌟", color: "#2ECC71" },
+  { id: "14", emoji: "🎵", color: "#9B59B6" },
+  { id: "15", emoji: "📄", color: "#1ABC9C" },
+  { id: "16", emoji: "🚀", color: "#E67E22" },
+  { id: "17", emoji: "📊", color: "#34495E", format: { ratio: "landscape", loose: true } },
+  { id: "18", emoji: "🎮", color: "#16A085" },
+  { id: "19", emoji: "💬", color: "#D35400" },
+  { id: "20", emoji: "🏷️", color: "#8E44AD" },
 ];
 
 // Card component with big fonts and Framer Motion animations
-function Card({ card, item }: { card: PlacedCard; item: LayoutItem }) {
-  const cellWidth = card.width / 4;
-  const cellHeight = card.height / 4;
+function Card({ card }: { card: PlacedCard<CardItem> }) {
+  const colSpan = card.grid!.colSpan;
+  const rowSpan = card.grid!.rowSpan;
 
   // Calculate responsive font size based on card size
-  const area = cellWidth * cellHeight;
+  const area = colSpan * rowSpan;
   let fontSize = 16;
   if (area >= 16) fontSize = 48;
   else if (area >= 9) fontSize = 36;
   else if (area >= 4) fontSize = 28;
   else if (area >= 2) fontSize = 20;
-
-  const colors = [
-    "#FF6B6B",
-    "#4ECDC4",
-    "#45B7D1",
-    "#FFA07A",
-    "#98D8C8",
-    "#F7DC6F",
-    "#BB8FCE",
-    "#85C1E2",
-    "#F8B195",
-    "#C06C84",
-  ];
-  const colorIndex = parseInt(card.id, 10) % colors.length;
-  const bgColor = colors[colorIndex];
 
   return (
     <motion.div
@@ -93,21 +65,19 @@ function Card({ card, item }: { card: PlacedCard; item: LayoutItem }) {
       }}
       className="card"
       style={{
-        gridRow: `span ${cellHeight}`,
-        gridColumn: `span ${cellWidth}`,
-        backgroundColor: bgColor,
+        gridRow: `span ${rowSpan}`,
+        gridColumn: `span ${colSpan}`,
+        backgroundColor: card.item.color,
         fontSize: `${fontSize}px`,
         fontWeight: "bold",
       }}
     >
       <div className="card-content">
-        <div className="card-emoji">{item.content}</div>
+        <div className="card-emoji">{card.item.emoji}</div>
         <div className="card-meta">
           <div className="card-size">
-            {cellWidth}x{cellHeight}
+            {colSpan}x{rowSpan}
           </div>
-          <div className="card-importance">★ {item.importance}</div>
-          {card.contentCapped && <div className="card-capped">📏 Capped</div>}
         </div>
       </div>
     </motion.div>
@@ -116,27 +86,39 @@ function Card({ card, item }: { card: PlacedCard; item: LayoutItem }) {
 
 export default function App() {
   const containerRef = useRef<HTMLDivElement>(null);
-  const [layout, setLayout] = useState<PlacedCard[]>([]);
+  const [layout, setLayout] = useState<PlacedCard<CardItem>[]>([]);
   const [gridDimensions, setGridDimensions] = useState({ cols: 0, rows: 0 });
   const [utilization, setUtilization] = useState(0);
+  const [orderFidelity, setOrderFidelity] = useState(0);
   const [cellSize] = useState(200);
 
   useEffect(() => {
     if (!containerRef.current) return;
 
-    const calculateLayout = (width: number, height: number) => {
-      const result = calculateCardLayout(sampleItems, width, height, cellSize, "m");
-      setLayout(result.placed);
-      setGridDimensions(result.grid);
+    const performLayout = (width: number, height: number) => {
+      const result = calculateLayout(sampleItems, width, height, {
+        baseSize: cellSize,
+        gap: 16,
+        includeGrid: true,
+      });
+
+      setLayout(result.cards);
+
+      // Calculate grid dimensions from pixel dimensions
+      const cols = Math.round(result.width / cellSize);
+      const rows = Math.round(result.height / cellSize);
+      setGridDimensions({ cols, rows });
+
       setUtilization(result.utilization);
+      setOrderFidelity(result.orderFidelity);
     };
 
     // Initial calculation
     const rect = containerRef.current.getBoundingClientRect();
-    calculateLayout(rect.width, rect.height);
+    performLayout(rect.width, rect.height);
 
     // Setup resize observer with throttling (150ms debounce)
-    const cleanup = createResizeObserver(containerRef.current, calculateLayout, 150);
+    const cleanup = createResizeObserver(containerRef.current, performLayout, 150);
 
     return cleanup;
   }, [cellSize]);
@@ -159,7 +141,11 @@ export default function App() {
           </div>
           <div className="stat">
             <span className="stat-label">Utilization:</span>
-            <span className="stat-value">{utilization}%</span>
+            <span className="stat-value">{(utilization * 100).toFixed(0)}%</span>
+          </div>
+          <div className="stat">
+            <span className="stat-label">Order Fidelity:</span>
+            <span className="stat-value">{(orderFidelity * 100).toFixed(0)}%</span>
           </div>
         </div>
       </header>
@@ -174,10 +160,9 @@ export default function App() {
         >
           <LayoutGroup>
             <AnimatePresence mode="popLayout">
-              {layout.map((card) => {
-                const item = sampleItems.find((i) => i.id === card.id);
-                return item ? <Card key={card.id} card={card} item={item} /> : null;
-              })}
+              {layout.map((card) => (
+                <Card key={card.item.id} card={card} />
+              ))}
             </AnimatePresence>
           </LayoutGroup>
         </div>

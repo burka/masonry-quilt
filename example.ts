@@ -1,101 +1,66 @@
 /**
- * Example usage of masonry-quilt
+ * Example usage of masonry-quilt v2.0.0
  */
 
-import { calculateCardLayout } from "./src/index";
+import { calculateLayout } from "./src/index";
 
-// Example 1: Basic layout with importance-based sizing
+// Example 1: Basic layout (items placed in input order)
 console.log("=== Example 1: Basic Layout ===");
-const items = [
-  { id: "note-1", importance: 10 },
-  { id: "note-2", importance: 8 },
-  { id: "note-3", importance: 5 },
-  { id: "note-4", importance: 3 },
-  { id: "note-5", importance: 1 },
+
+interface NoteItem {
+  id: string;
+  title?: string;
+}
+
+const items: NoteItem[] = [
+  { id: "note-1", title: "First" },
+  { id: "note-2", title: "Second" },
+  { id: "note-3", title: "Third" },
+  { id: "note-4", title: "Fourth" },
+  { id: "note-5", title: "Fifth" },
 ];
 
-const result = calculateCardLayout(items, 1920, 1080, 200, "m");
+const result = calculateLayout(items, 1920, 1080);
 
-console.log("Placed cards:", result.placed.length);
-console.log("Grid dimensions:", result.grid);
-console.log("Utilization:", result.utilization + "%");
+console.log("Placed cards:", result.cards.length);
+console.log("Layout dimensions:", result.width, "x", result.height, "px");
+console.log("Utilization:", (result.utilization * 100).toFixed(1) + "%");
+console.log("Order fidelity:", (result.orderFidelity * 100).toFixed(1) + "%");
 console.log("\nCard positions:");
-result.placed.forEach((card) => {
-  const cellWidth = card.width / 4;
-  const cellHeight = card.height / 4;
-  console.log(`  ${card.id}: ${cellWidth}x${cellHeight} cells at (${card.col / 4}, ${card.row / 4})`);
+result.cards.forEach((card) => {
+  console.log(`  ${card.item.id}: ${card.width}x${card.height}px at (${card.x}, ${card.y})`);
 });
 
-// Example 2: Content-aware sizing
-console.log("\n=== Example 2: Content-Aware Sizing ===");
-const contentItems = [
-  {
-    id: "short",
-    importance: 10,
-    content: "Buy milk",
-  },
-  {
-    id: "medium",
-    importance: 8,
-    content: "Remember to call mom about dinner plans this weekend".repeat(2),
-  },
-  {
-    id: "long",
-    importance: 6,
-    content: "Lorem ipsum dolor sit amet, consectetur adipiscing elit.".repeat(10),
-  },
-  {
-    id: "image",
-    importance: 5,
-    type: "image",
-    content: "Short",
-  },
+// Example 2: Format constraints
+console.log("\n=== Example 2: Format Constraints ===");
+
+interface FormatItem {
+  id: string;
+  format?: { ratio?: string; size?: { width: number; height: number }; minSize?: { width: number; height: number } };
+}
+
+const formatItems: FormatItem[] = [
+  { id: "video", format: { ratio: "16:9" } },
+  { id: "portrait", format: { ratio: "portrait" } },
+  { id: "banner", format: { ratio: "banner" } },
+  { id: "exact", format: { size: { width: 400, height: 200 } } },
+  { id: "big", format: { minSize: { width: 600, height: 400 } } },
 ];
 
-const contentResult = calculateCardLayout(contentItems, 1920, 1080, 200, "m");
-console.log("Content-aware layout:");
-contentResult.placed.forEach((card) => {
-  console.log(
-    `  ${card.id}: ${card.width / 4}x${card.height / 4} cells, contentCapped: ${card.contentCapped || false}`,
-  );
-});
-
-// Example 3: Format constraints
-console.log("\n=== Example 3: Format Constraints ===");
-const formatItems = [
-  {
-    id: "video",
-    importance: 8,
-    format: {
-      ratio: "16:9",
-      strict: true,
-    },
-  },
-  {
-    id: "portrait",
-    importance: 6,
-    format: {
-      ratio: "portrait", // 1:2
-      strict: true,
-    },
-  },
-  {
-    id: "banner",
-    importance: 4,
-    format: {
-      ratio: "banner", // 4:1
-      strict: true,
-    },
-  },
-];
-
-const formatResult = calculateCardLayout(formatItems, 1920, 1080, 200, "m");
+const formatResult = calculateLayout(formatItems, 1920, 1080);
 console.log("Format-constrained layout:");
-formatResult.placed.forEach((card) => {
+formatResult.cards.forEach((card) => {
   const ratio = (card.width / card.height).toFixed(2);
-  console.log(`  ${card.id}: ${card.width / 4}x${card.height / 4} cells, ratio: ${ratio}`);
+  console.log(`  ${card.item.id}: ${card.width}x${card.height}px, ratio: ${ratio}`);
+});
+
+// Example 3: CSS Grid support
+console.log("\n=== Example 3: CSS Grid Support ===");
+const gridResult = calculateLayout(items, 1920, 1080, { includeGrid: true });
+console.log("Grid data for CSS Grid:");
+gridResult.cards.forEach((card) => {
+  console.log(`  ${card.item.id}: grid-column: ${card.grid!.col} / span ${card.grid!.colSpan}, grid-row: ${card.grid!.row} / span ${card.grid!.rowSpan}`);
 });
 
 console.log("\n=== Summary ===");
 console.log("All examples completed successfully!");
-console.log("Build and tests are green ✓");

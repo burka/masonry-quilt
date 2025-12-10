@@ -1,19 +1,16 @@
 # masonry-quilt
 
-A pure TypeScript masonry layout calculator that packs boxes into a given space - **no UI, just boxes in and positioning out**.
+A pure TypeScript masonry layout calculator — **items in, pixel positions out**.
 
-This library provides a sophisticated masonry layout algorithm with importance-based sizing, content-aware optimization, and flexible formatting options. Perfect for building card-based UIs, galleries, dashboards, or any layout where you need intelligent box packing.
+Give it items in your preferred order, get back pixel coordinates ready to render. No DOM, no UI framework dependencies. Works anywhere JavaScript runs.
 
 ## Features
 
-- **Pure calculation** - No UI dependencies, works anywhere JavaScript runs
-- **Importance-based sizing** - Higher importance items get more prominent placement and larger sizes
-- **Content-aware** - Automatically adjusts card sizes based on content length to avoid large empty spaces
-- **Flexible formatting** - Support for aspect ratios, minimum sizes, and strict constraints
-- **Efficient packing** - Column-based masonry algorithm with gap-filling and space optimization
-- **TypeScript native** - Fully typed with comprehensive type definitions
-- **Zero dependencies** - Lightweight and fast
-- **Optional helpers** - ResizeObserver and scroll optimization utilities included
+- **Order-preserving** — Items placed in your input order
+- **Flexible packing** — Configure how much items can move to fill gaps
+- **All pixels** — Input and output in pixels, no unit conversion needed
+- **Type-safe** — Generics preserve your item types
+- **Zero dependencies** — Lightweight and fast
 
 ## Installation
 
@@ -21,201 +18,294 @@ This library provides a sophisticated masonry layout algorithm with importance-b
 npm install masonry-quilt
 ```
 
-## Live Example
-
-Check out the [React example](./example-react/) with colorful cards and big fonts to see the library in action!
-
-```bash
-cd example-react
-npm install
-npm run dev
-```
-
 ## Basic Usage
 
 ```typescript
-import { calculateCardLayout } from "masonry-quilt";
+import { calculateLayout } from "masonry-quilt";
 
 const items = [
-  { id: "1", importance: 10 }, // Most important
-  { id: "2", importance: 5 },
-  { id: "3", importance: 2 },
-  { id: "4", importance: 1 },
+  { title: "Hero Image", color: "#e74c3c" },
+  { title: "Featured Video", color: "#3498db", format: { ratio: "16:9" } },
+  { title: "Portrait Photo", color: "#2ecc71", format: { ratio: "portrait" } },
+  { title: "Wide Banner", color: "#9b59b6", format: { minSize: { width: 400, height: 100 } } },
+  { title: "Square Thumb", color: "#f39c12", format: { size: { width: 200, height: 200 } } },
+  { title: "Landscape", color: "#1abc9c", format: { ratio: "landscape" } },
+  { title: "Regular Card", color: "#34495e" },
+  { title: "Another Card", color: "#e67e22" },
 ];
 
-const result = calculateCardLayout(
-  items,
-  1920, // viewport width
-  1080, // viewport height
-  200, // cell size in pixels
-  "m", // gap size: "s" | "m" | "l"
-);
+const result = calculateLayout(items, 1200, 800);
 
-console.log(result.placed); // Array of positioned cards with dimensions
-console.log(result.utilization); // Space utilization percentage
+// Container size
+console.log(result.width, result.height);
+
+// Each card with your original item + position
+result.cards.forEach(card => {
+  console.log(card.item.title, card.item.color);  // Your data
+  console.log(card.x, card.y, card.width, card.height);  // Pixels
+});
 ```
 
 ## API
 
-### calculateCardLayout(items, viewportWidth, viewportHeight, cellSize, gapSize, options?)
-
-Calculate masonry layout for given items and viewport.
-
-**Parameters:**
-
-- `items: LayoutItem[]` - Items to place in the layout
-- `viewportWidth: number` - Available width in pixels
-- `viewportHeight: number` - Available height in pixels
-- `cellSize: number` - Size of one cell in pixels (e.g., 200px means 2x2 card = 400px)
-- `gapSize: "s" | "m" | "l"` - Gap between items (s=8px, m=16px, l=24px)
-- `options?: LayoutOptions` - Optional layout configuration
-
-**Returns:** `LayoutResult`
+### calculateLayout(items, width, height, options?)
 
 ```typescript
-interface LayoutResult {
-  placed: PlacedCard[]; // Successfully placed cards
-  unplaced: string[]; // IDs of items that couldn't fit
-  spaces: AvailableSpace[]; // Remaining available spaces
-  grid: { cols: number; rows: number }; // Grid dimensions
-  utilization: number; // Space utilization percentage (0-100)
-}
+function calculateLayout<T extends LayoutItem>(
+  items: T[],
+  width: number,      // Container width (px)
+  height: number,     // Container height (px)
+  options?: LayoutOptions
+): LayoutResult<T>;
 ```
 
-### LayoutItem Interface
+The `extends LayoutItem` gives you IDE autocomplete for `format` options while preserving all your custom fields.
+
+### Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `baseSize` | number | 200 | Default item size in pixels. Items without explicit size will be approximately `baseSize × baseSize`. |
+| `gap` | number | 16 | Gap between items in pixels. |
+| `looseness` | number | 0.2 | How much items can move from their input position to fill gaps. `0` = strict order, `1` = any movement allowed. |
+| `includeGrid` | boolean | false | Include grid positioning data for CSS Grid usage. |
+
+### Item Format
+
+Items can have any shape. The only recognized property is `format` for layout hints:
 
 ```typescript
 interface LayoutItem {
-  id: string; // Unique identifier
-  importance: number; // 0-10 scale, affects size and priority
-  content?: string; // Optional content for size calculation
-  title?: string; // Optional title for size calculation
-  type?: string; // Optional type: "image" | "video" | "audio" | "document"
   format?: {
-    ratio?: string | string[]; // Aspect ratio: "1:1" | "16:9" | "portrait" | "landscape" | "banner" | "tower"
-    strict?: boolean; // If true, must match ratio exactly
-    minSize?: { width: number; height: number }; // Minimum size in cells
+    size?: { width: number; height: number };     // Exact size (px)
+    minSize?: { width: number; height: number };  // Minimum size (px)
+    maxSize?: { width: number; height: number };  // Maximum size (px)
+    ratio?: string;   // Aspect ratio: "16:9", "4:3", "portrait", "landscape", "banner", "tower"
+    loose?: boolean;  // Allow ratio flexibility (default: false, shortcuts default: true)
   };
 }
 ```
 
-### PlacedCard Interface
+### Result
 
 ```typescript
-interface PlacedCard {
-  id: string; // Item identifier
-  width: number; // Width in internal units (4 units = 1 cell)
-  height: number; // Height in internal units
-  row: number; // Row position in internal units
-  col: number; // Column position in internal units
-  importance: number; // Original importance score
-  contentCapped?: boolean; // True if size was limited by content length
+interface LayoutResult<T> {
+  cards: PlacedCard<T>[];  // Positioned items
+  width: number;           // Total layout width (px)
+  height: number;          // Total layout height (px)
+  utilization: number;     // Space efficiency (0-1)
+  orderFidelity: number;   // Order preservation (0-1, where 1 = perfect)
+}
+
+interface PlacedCard<T> {
+  item: T;        // Your original item (unchanged)
+  x: number;      // Left position (px)
+  y: number;      // Top position (px)
+  width: number;  // Width (px)
+  height: number; // Height (px)
+  grid?: {        // Optional grid data for CSS Grid
+    col: number;      // Column start (1-based)
+    row: number;      // Row start (1-based)
+    colSpan: number;  // Column span
+    rowSpan: number;  // Row span
+  };
 }
 ```
 
-## Advanced Examples
+## Examples
 
-### Configuring the Sprinkle Effect
-
-By default, the library uses a "sprinkle effect" that randomly boosts ~20% of lower-importance cards for visual variety. You can configure or disable this:
+### Rendering
 
 ```typescript
-// Disable sprinkle effect completely (strict importance ordering)
-const result = calculateCardLayout(items, 1920, 1080, 200, "m", {
-  sprinkle: false,
-});
+const result = calculateLayout(items, 1200, 800);
 
-// Enable with default settings (20% boost by 0.3)
-const result = calculateCardLayout(items, 1920, 1080, 200, "m", {
-  sprinkle: true,
-});
+// Set container size
+container.style.width = `${result.width}px`;
+container.style.height = `${result.height}px`;
+container.style.position = 'relative';
 
-// Custom configuration
-const result = calculateCardLayout(items, 1920, 1080, 200, "m", {
-  sprinkle: {
-    enabled: true,
-    percentage: 0.3, // 30% of cards get boosted
-    boost: 0.4, // Boost percentile by 0.4 (40%)
-  },
+// Position each card
+result.cards.forEach(card => {
+  const el = document.createElement('div');
+  el.style.position = 'absolute';
+  el.style.left = `${card.x}px`;
+  el.style.top = `${card.y}px`;
+  el.style.width = `${card.width}px`;
+  el.style.height = `${card.height}px`;
+  el.textContent = card.item.title;
+  container.appendChild(el);
 });
 ```
 
-**When to disable:**
-- When you need strict importance-based ordering
-- For predictable, non-randomized layouts
-- When building galleries with exact order requirements
+### React
 
-**When to enable:**
-- For visually interesting, varied layouts (default)
-- To prevent monotonous size patterns
-- When order flexibility is acceptable
+```tsx
+// Absolute positioning
+const result = calculateLayout(items, 1200, 800);
 
-### Content-Aware Sizing
+<div style={{ width: result.width, height: result.height, position: 'relative' }}>
+  {result.cards.map((card, i) => (
+    <div
+      key={i}
+      style={{
+        position: 'absolute',
+        left: card.x,
+        top: card.y,
+        width: card.width,
+        height: card.height,
+      }}
+    >
+      {card.item.title}
+    </div>
+  ))}
+</div>
 
-```typescript
-const items = [
-  {
-    id: "short-note",
-    importance: 10,
-    content: "Buy milk", // Short content gets smaller card despite high importance
-  },
-  {
-    id: "long-article",
-    importance: 5,
-    content: "Lorem ipsum...".repeat(100), // Long content gets appropriate space
-  },
-  {
-    id: "image-note",
-    importance: 5,
-    type: "image",
-    content: "Short", // Images bypass content caps
-  },
-];
+// CSS Grid (with includeGrid: true)
+const result = calculateLayout(items, 1200, 800, { includeGrid: true });
 
-const result = calculateCardLayout(items, 1920, 1080, 200, "m");
+<div style={{ 
+  display: 'grid',
+  gridTemplateColumns: `repeat(${Math.ceil(result.width / 200)}, 1fr)`,
+  gridAutoRows: '200px',
+  gap: '16px'
+}}>
+  {result.cards.map((card, i) => (
+    <div
+      key={i}
+      style={{
+        gridColumn: `${card.grid.col} / span ${card.grid.colSpan}`,
+        gridRow: `${card.grid.row} / span ${card.grid.rowSpan}`,
+      }}
+    >
+      {card.item.title}
+    </div>
+  ))}
+</div>
 ```
 
-### Aspect Ratio Constraints
+### Canvas
 
 ```typescript
-const items = [
-  {
-    id: "video",
-    importance: 8,
-    format: {
-      ratio: "16:9",
-      strict: true, // Must maintain exact ratio
-    },
-  },
-  {
-    id: "portrait",
-    importance: 6,
-    format: {
-      ratio: "portrait", // Shortcut for 1:2
-      strict: false, // Hint, not strict requirement
-    },
-  },
-];
+const result = calculateLayout(items, 1200, 800);
 
-const result = calculateCardLayout(items, 1920, 1080, 200, "m");
+canvas.width = result.width;
+canvas.height = result.height;
+
+result.cards.forEach(card => {
+  ctx.fillRect(card.x, card.y, card.width, card.height);
+});
 ```
 
-### Minimum Size Requirements
+### Custom Item Types
+
+Your items can have any shape — types flow through unchanged:
+
+```typescript
+interface MyCard {
+  title: string;
+  color: string;
+  priority: number;
+  onClick: () => void;
+  format?: { ratio?: string; minSize?: { width: number; height: number } };
+}
+
+const items: MyCard[] = [
+  { title: "Hello", color: "red", priority: 1, onClick: () => alert("hi") },
+  { title: "Video", color: "blue", priority: 2, onClick: () => {}, format: { ratio: "16:9" } },
+  { title: "Big", color: "green", priority: 3, onClick: () => {}, format: { minSize: { width: 400, height: 300 } } },
+];
+
+const result = calculateLayout(items, 1200, 800);
+
+result.cards.forEach(card => {
+  card.item.title;     // string
+  card.item.color;     // string
+  card.item.priority;  // number
+  card.item.onClick;   // () => void
+});
+```
+
+### Item Sizes
 
 ```typescript
 const items = [
-  {
-    id: "banner",
-    importance: 3,
-    format: {
-      minSize: { width: 4, height: 1 }, // Minimum 4x1 cells
-      ratio: "banner", // 4:1 ratio
-      strict: true,
-    },
-  },
+  // Default size (baseSize × baseSize)
+  { title: "Normal" },
+
+  // Exact size
+  { title: "Exact", format: { size: { width: 400, height: 200 } } },
+
+  // Minimum size
+  { title: "Big", format: { minSize: { width: 400, height: 300 } } },
+
+  // Maximum size
+  { title: "Small", format: { maxSize: { width: 150, height: 150 } } },
 ];
 
-const result = calculateCardLayout(items, 1920, 1080, 200, "m");
+const result = calculateLayout(items, 1200, 800);
+```
+
+### Aspect Ratios
+
+```typescript
+const items = [
+  // Strict ratio (must match exactly)
+  { title: "Video", format: { ratio: "16:9" } },
+
+  // Flexible ratio (prefers this, but can adjust)
+  { title: "Photo", format: { ratio: "4:3", loose: true } },
+
+  // Shortcuts (implicitly loose)
+  { title: "Portrait", format: { ratio: "portrait" } },   // 1:2
+  { title: "Landscape", format: { ratio: "landscape" } }, // 2:1
+  { title: "Banner", format: { ratio: "banner" } },       // 4:1
+  { title: "Tower", format: { ratio: "tower" } },         // 1:4
+];
+
+const result = calculateLayout(items, 1200, 800);
+```
+
+### Order vs Packing
+
+```typescript
+// Strict order — items stay in sequence, may leave gaps
+const strict = calculateLayout(items, 1200, 800, { looseness: 0 });
+console.log(strict.orderFidelity);  // 1.0 (perfect order)
+
+// Balanced — items can move ±20% to fill gaps (default)
+const balanced = calculateLayout(items, 1200, 800, { looseness: 0.2 });
+
+// Loose — items can move anywhere for best packing
+const loose = calculateLayout(items, 1200, 800, { looseness: 1 });
+console.log(loose.orderFidelity);  // e.g., 0.7 (some reordering occurred)
+```
+
+### Gap and Base Size
+
+```typescript
+// Tight layout with small items
+const tight = calculateLayout(items, 1200, 800, {
+  baseSize: 100,
+  gap: 4,
+});
+
+// Spacious layout with large items
+const spacious = calculateLayout(items, 1200, 800, {
+  baseSize: 300,
+  gap: 24,
+});
+```
+
+### CSS Grid Support
+
+```typescript
+// Get grid data for CSS Grid usage
+const result = calculateLayout(items, 1200, 800, { includeGrid: true });
+
+result.cards.forEach(card => {
+  console.log(card.grid.col, card.grid.row);        // Start position (1-based)
+  console.log(card.grid.colSpan, card.grid.rowSpan); // Span counts
+});
 ```
 
 ## Helper Utilities
@@ -228,13 +318,13 @@ import { createResizeObserver } from "masonry-quilt";
 const cleanup = createResizeObserver(
   containerElement,
   (width, height) => {
-    const result = calculateCardLayout(items, width, height, 200, "m");
-    updateUI(result.placed);
+    const result = calculateLayout(items, width, height);
+    render(result);
   },
-  150, // debounce delay
+  150  // debounce ms
 );
 
-// Later, clean up
+// Clean up when done
 cleanup();
 ```
 
@@ -245,60 +335,28 @@ import { createScrollOptimizer } from "masonry-quilt";
 
 const cleanup = createScrollOptimizer(
   scrollContainer,
-  200, // estimated item height
+  200,  // estimated item height
   ({ start, end }) => {
-    // Only render items from index start to end
     setVisibleRange({ start, end });
   },
-  100, // debounce delay
+  100  // debounce ms
 );
 
-// Later, clean up
 cleanup();
 ```
 
 ## How It Works
 
-1. **Importance-based percentile ranking** - Items are ranked by importance, creating an even distribution across size buckets regardless of absolute scores
-
-2. **Column-based masonry placement** - Each item is placed in the shortest available column span, creating a balanced layout
-
-3. **Gap-filling optimization** - Smaller items are intelligently placed in remaining gaps
-
-4. **Proportional scaling** - When space utilization is low (<75%), cards are scaled up to fill empty space
-
-5. **Horizontal expansion** - Cards expand horizontally to eliminate vertical strips of wasted space
-
-6. **Content-aware capping** - Short text content prevents unnecessarily large cards, improving density
-
-## Internal Coordinate System
-
-The library uses a precise internal coordinate system with 0.25 cell granularity (4 internal units = 1 cell). This allows for:
-
-- Sub-cell positioning precision
-- Smooth aspect ratio handling
-- Efficient space utilization
-- Flexible card sizing
-
-When you receive `PlacedCard` results, you can convert internal units to cells by dividing by 4:
-
-```typescript
-const cellWidth = placedCard.width / 4;
-const cellHeight = placedCard.height / 4;
-```
+1. **Sequential placement** — Items placed in input order into shortest column
+2. **Gap filling** — Within `looseness` limit, items can move to fill gaps
+3. **Expansion** — Cards scale up to fill empty space when utilization is low
 
 ## Performance
 
-- Handles hundreds of items efficiently
-- Deterministic output - same input always produces same layout
-- No DOM dependencies - runs in Node.js or browser
-- Optimized algorithms with O(n log n) complexity
-- Optional helpers for UI integration (debouncing, virtualization)
+- **10,000 items in ~80ms**
+- **Deterministic** — Same input always produces same output
+- **No DOM** — Pure calculation, runs anywhere
 
 ## License
 
 MIT
-
-## Contributing
-
-Contributions welcome! This library was extracted from a private project's masonry layout implementation.
