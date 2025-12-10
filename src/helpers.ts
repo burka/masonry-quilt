@@ -34,8 +34,8 @@ function debounce<T extends (...args: any[]) => void>(
  * const cleanup = createResizeObserver(
  *   containerElement,
  *   (width, height) => {
- *     const result = calculateCardLayout(items, width, height, 200, "m");
- *     // Update your UI with result.placed
+ *     const result = calculateLayout(items, width, height);
+ *     // Update your UI with result.cards
  *   },
  *   150
  * );

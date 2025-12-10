@@ -13,29 +13,8 @@ const RATIO_SHORTCUTS: Record<string, string> = {
   tower: "1:4",
 };
 
-// Size buckets for deterministic size variation
-// Each bucket defines: threshold (minimum percentile), and available sizes in internal units
-const SIZE_BUCKETS: { threshold: number; sizes: { width: number; height: number }[] }[] = [
-  { threshold: 0.9, sizes: [{ width: 16, height: 16 }, { width: 16, height: 12 }, { width: 12, height: 16 }] },
-  { threshold: 0.7, sizes: [{ width: 12, height: 12 }, { width: 12, height: 8 }, { width: 8, height: 12 }] },
-  { threshold: 0.4, sizes: [{ width: 8, height: 8 }, { width: 8, height: 12 }, { width: 12, height: 8 }] },
-  { threshold: 0, sizes: [{ width: 8, height: 8 }] },
-];
-
 /**
- * Simple hash function for deterministic variant selection
- */
-function hashString(str: string): number {
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) {
-    hash = (hash << 5) - hash + str.charCodeAt(i);
-    hash = hash & hash; // Convert to 32bit integer
-  }
-  return Math.abs(hash);
-}
-
-/**
- * Calculate card size from format constraints (simplified for v2.0.0)
+ * Calculate card size from format constraints
  * All items start at the same default size, then apply format constraints
  */
 function calculateCardSize<T extends LayoutItem>(
@@ -487,7 +466,7 @@ export function calculateLayout<T extends LayoutItem>(
 
   // Convert to internal units (4 internal units = 1 cell)
   const gridCols = gridColsInCells * 4;
-  let gridRows = gridRowsInCells * 4;
+  const gridRows = gridRowsInCells * 4;
 
   // Calculate maximum displacement based on looseness
   const maxDisplacement = Math.floor(looseness * items.length);
