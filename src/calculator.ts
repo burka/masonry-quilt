@@ -22,6 +22,15 @@ const RATIO_SHORTCUTS: Record<string, string> = {
   tower: "1:4",
 };
 
+// Size buckets based on percentile thresholds
+// Each bucket defines: threshold (minimum percentile), and available sizes in internal units
+const SIZE_BUCKETS: { threshold: number; sizes: { width: number; height: number }[] }[] = [
+  { threshold: 0.9, sizes: [{ width: 16, height: 16 }, { width: 16, height: 12 }, { width: 12, height: 16 }] },
+  { threshold: 0.7, sizes: [{ width: 12, height: 12 }, { width: 12, height: 8 }, { width: 8, height: 12 }] },
+  { threshold: 0.4, sizes: [{ width: 8, height: 8 }, { width: 8, height: 12 }, { width: 12, height: 8 }] },
+  { threshold: 0, sizes: [{ width: 8, height: 8 }] },
+];
+
 /**
  * Simple hash function for deterministic variant selection
  */
@@ -112,37 +121,9 @@ function calculateCardSizeFromPercentile(
 
   const hash = hashString(item.id);
 
-  // Size mapping based on percentile
-  let baseSize: { width: number; height: number };
-
-  if (percentile >= 0.9) {
-    // Top 10%: Largest cards (4x4, 4x3, 3x4 cells)
-    const sizes = [
-      { width: 16, height: 16 },
-      { width: 16, height: 12 },
-      { width: 12, height: 16 },
-    ];
-    baseSize = sizes[hash % sizes.length];
-  } else if (percentile >= 0.7) {
-    // Top 30%: Large cards (3x3, 3x2, 2x3 cells)
-    const sizes = [
-      { width: 12, height: 12 },
-      { width: 12, height: 8 },
-      { width: 8, height: 12 },
-    ];
-    baseSize = sizes[hash % sizes.length];
-  } else if (percentile >= 0.4) {
-    // Top 60%: Medium cards (2x2, 2x3, 3x2 cells)
-    const sizes = [
-      { width: 8, height: 8 },
-      { width: 8, height: 12 },
-      { width: 12, height: 8 },
-    ];
-    baseSize = sizes[hash % sizes.length];
-  } else {
-    // Rest: Small cards (minimum 2x2 cells)
-    baseSize = { width: 8, height: 8 };
-  }
+  // Size mapping based on percentile using SIZE_BUCKETS
+  const bucket = SIZE_BUCKETS.find((b) => percentile >= b.threshold) ?? SIZE_BUCKETS[SIZE_BUCKETS.length - 1];
+  const baseSize = { ...bucket.sizes[hash % bucket.sizes.length] };
 
   // Apply content-based size cap
   let contentCapped = false;
@@ -255,6 +236,54 @@ function findAvailablePosition(
   return null;
 }
 
+/** Item with calculated percentile for placement */
+type ItemWithPercentile = LayoutItem & { percentile: number; placementPercentile?: number };
+
+/** Shared context for layout phases */
+interface LayoutContext {
+  gridCols: number;
+  gridRows: number;
+  occupied: boolean[][];
+  placed: PlacedCard[];
+  itemById: Map<string, LayoutItem>;
+}
+
+/**
+ * Check if a card can be scaled/expanded
+ */
+function canModifyCard(
+  card: PlacedCard,
+  originalItem: LayoutItem | undefined,
+  allowContentCapped: boolean,
+  checkMinSize: boolean,
+): boolean {
+  if (originalItem?.format?.strict) return false;
+  if (checkMinSize && originalItem?.format?.minSize) return false;
+  if (card.contentCapped && !allowContentCapped) return false;
+  return true;
+}
+
+/**
+ * Mark a rectangular region in a 2D boolean grid
+ */
+function markRegion(
+  grid: boolean[][],
+  row: number,
+  col: number,
+  width: number,
+  height: number,
+  maxRows: number,
+  maxCols: number,
+): void {
+  for (let r = row; r < row + height; r++) {
+    for (let c = col; c < col + width; c++) {
+      if (r < maxRows && c < maxCols) {
+        grid[r][c] = true;
+      }
+    }
+  }
+}
+
 /**
  * Find available spaces in grid
  */
@@ -295,14 +324,7 @@ function findAvailableSpaces(
           }
         }
 
-        // Mark as checked
-        for (let r = row; r < row + height; r++) {
-          for (let c = col; c < col + width; c++) {
-            if (r < gridRows && c < gridCols) {
-              checked[r][c] = true;
-            }
-          }
-        }
+        markRegion(checked, row, col, width, height, gridRows, gridCols);
 
         if (width > 0 && height > 0) {
           spaces.push({ width, height, row, col });
@@ -312,6 +334,213 @@ function findAvailableSpaces(
   }
 
   return spaces;
+}
+
+/**
+ * PHASE 1: Place each item in shortest column using masonry algorithm
+ */
+function placeItemsInColumns(
+  placementOrder: ItemWithPercentile[],
+  ctx: LayoutContext,
+): string[] {
+  const { gridCols, gridRows, occupied, placed } = ctx;
+  const columnHeights: number[] = Array(gridCols).fill(0);
+  const unplaced: string[] = [];
+
+  for (const item of placementOrder) {
+    const size = calculateCardSizeFromPercentile(item, gridCols, gridRows, item.percentile);
+
+    if (!size) {
+      unplaced.push(item.id);
+      continue;
+    }
+
+    // Find shortest contiguous span of columns
+    let bestCol = 0;
+    let minHeight = Infinity;
+
+    for (let col = 0; col <= gridCols - size.width; col++) {
+      let maxHeightInSpan = 0;
+      for (let c = col; c < col + size.width; c++) {
+        maxHeightInSpan = Math.max(maxHeightInSpan, columnHeights[c]);
+      }
+
+      if (maxHeightInSpan < minHeight) {
+        minHeight = maxHeightInSpan;
+        bestCol = col;
+      }
+    }
+
+    const col = bestCol;
+    const row = minHeight;
+
+    if (row + size.height <= gridRows) {
+      placed.push({
+        id: item.id,
+        width: size.width,
+        height: size.height,
+        row,
+        col,
+        importance: item.importance,
+        contentCapped: size.contentCapped,
+      });
+
+      markRegion(occupied, row, col, size.width, size.height, gridRows, gridCols);
+
+      for (let c = bestCol; c < bestCol + size.width; c++) {
+        columnHeights[c] = row + size.height;
+      }
+    } else {
+      unplaced.push(item.id);
+    }
+  }
+
+  return unplaced;
+}
+
+/**
+ * PHASE 2: Try to place unplaced items in available gaps
+ */
+function fillGaps(
+  unplacedIds: string[],
+  placementOrder: ItemWithPercentile[],
+  ctx: LayoutContext,
+): string[] {
+  const { gridCols, gridRows, occupied, placed } = ctx;
+
+  const unplacedItems = unplacedIds
+    .map((id) => placementOrder.find((item) => item.id === id))
+    .filter((item): item is ItemWithPercentile => item !== undefined);
+
+  unplacedItems.sort((a, b) => {
+    const sizeA = calculateCardSizeFromPercentile(a, gridCols, gridRows, a.percentile);
+    const sizeB = calculateCardSizeFromPercentile(b, gridCols, gridRows, b.percentile);
+    if (!sizeA) return 1;
+    if (!sizeB) return -1;
+    return sizeA.width * sizeA.height - sizeB.width * sizeB.height;
+  });
+
+  const stillUnplaced: string[] = [];
+
+  for (const item of unplacedItems) {
+    if (item.format?.strict) {
+      stillUnplaced.push(item.id);
+      continue;
+    }
+
+    let size = calculateCardSizeFromPercentile(item, gridCols, gridRows, Math.max(0, item.percentile - 0.3));
+    let attempts = 0;
+    let placedCard = false;
+
+    while (size && attempts < 3) {
+      const position = findAvailablePosition(occupied, size.width, size.height, gridCols, gridRows);
+
+      if (position) {
+        placed.push({
+          id: item.id,
+          width: size.width,
+          height: size.height,
+          row: position.row,
+          col: position.col,
+          importance: item.importance,
+          contentCapped: size.contentCapped,
+        });
+
+        markRegion(occupied, position.row, position.col, size.width, size.height, gridRows, gridCols);
+        placedCard = true;
+        break;
+      }
+
+      attempts++;
+      if (attempts === 1 && !item.format?.ratio) {
+        size = { width: 4, height: 4 };
+      } else if (attempts === 2 && !item.format?.ratio) {
+        size = { width: 4, height: 2 };
+      } else {
+        break;
+      }
+    }
+
+    if (!placedCard) {
+      stillUnplaced.push(item.id);
+    }
+  }
+
+  return stillUnplaced;
+}
+
+/**
+ * PHASE 3: Scale cards proportionally when utilization is low
+ */
+function scaleCards(
+  ctx: LayoutContext,
+  utilizationBeforeExpansion: number,
+  actualGridRowsInUnits: number,
+): void {
+  const { gridCols, placed, itemById } = ctx;
+
+  if (utilizationBeforeExpansion >= 0.75 || placed.length === 0) {
+    return;
+  }
+
+  const targetUtilization = 0.8;
+  const scaleFactor = Math.sqrt(targetUtilization / utilizationBeforeExpansion);
+  const cappedScaleFactor = Math.min(scaleFactor, 2.0);
+  const allowContentCappedScaling = utilizationBeforeExpansion < 0.7;
+
+  for (const card of placed) {
+    const originalItem = itemById.get(card.id);
+    if (!canModifyCard(card, originalItem, allowContentCappedScaling, true)) {
+      continue;
+    }
+
+    const newWidth = Math.max(2, Math.round(card.width * cappedScaleFactor));
+    const newHeight = Math.max(2, Math.round(card.height * cappedScaleFactor));
+
+    if (newWidth <= gridCols && newHeight <= actualGridRowsInUnits) {
+      card.width = newWidth;
+      card.height = newHeight;
+    }
+  }
+}
+
+/**
+ * PHASE 4: Expand cards horizontally to fill remaining gaps
+ */
+function expandHorizontally(
+  ctx: LayoutContext,
+  utilizationBeforeExpansion: number,
+  actualGridRowsInUnits: number,
+): void {
+  const { gridCols, occupied, placed, itemById } = ctx;
+  const allowContentCappedExpansion = utilizationBeforeExpansion < 0.7;
+
+  for (const card of placed) {
+    const rightCol = card.col + card.width;
+    if (rightCol >= gridCols) continue;
+
+    let canExpandRight = true;
+    for (let r = card.row; r < card.row + card.height; r++) {
+      for (let c = rightCol; c < gridCols; c++) {
+        if (r >= actualGridRowsInUnits || occupied[r][c]) {
+          canExpandRight = false;
+          break;
+        }
+      }
+      if (!canExpandRight) break;
+    }
+
+    if (canExpandRight) {
+      const originalItem = itemById.get(card.id);
+      if (!canModifyCard(card, originalItem, allowContentCappedExpansion, false)) {
+        continue;
+      }
+
+      const expandWidth = gridCols - rightCol;
+      markRegion(occupied, card.row, rightCol, expandWidth, card.height, actualGridRowsInUnits, gridCols);
+      card.width = gridCols - card.col;
+    }
+  }
 }
 
 /**
@@ -336,6 +565,7 @@ export function calculateCardLayout(
   options?: LayoutOptions,
 ): LayoutResult {
   const gap = GAP_SIZES[gapSize];
+  const itemById = new Map(items.map((item) => [item.id, item]));
 
   // Calculate grid dimensions
   const gridColsInCells = Math.floor(viewportWidth / (cellSize + gap));
@@ -413,149 +643,19 @@ export function calculateCardLayout(
     }));
   }
 
-  // Column-based masonry algorithm
-  const columnHeights: number[] = Array(gridCols).fill(0);
+  // Initialize layout context
   const placed: PlacedCard[] = [];
-  const unplaced: string[] = [];
   const occupied: boolean[][] = Array.from({ length: gridRows }, () => Array(gridCols).fill(false));
+  const ctx: LayoutContext = { gridCols, gridRows, occupied, placed, itemById };
 
-  // PHASE 1: Place each item in shortest column
-  for (let i = 0; i < placementOrder.length; i++) {
-    const item = placementOrder[i];
-    const size = calculateCardSizeFromPercentile(item, gridCols, gridRows, item.percentile);
+  // PHASE 1: Place items in columns
+  const unplacedIds = placeItemsInColumns(placementOrder, ctx);
 
-    if (!size) {
-      unplaced.push(item.id);
-      continue;
-    }
+  // PHASE 2: Fill gaps with unplaced items
+  const stillUnplaced = fillGaps(unplacedIds, placementOrder, ctx);
 
-    // Find shortest contiguous span of columns
-    let bestCol = 0;
-    let minHeight = Infinity;
-
-    for (let col = 0; col <= gridCols - size.width; col++) {
-      let maxHeightInSpan = 0;
-      for (let c = col; c < col + size.width; c++) {
-        maxHeightInSpan = Math.max(maxHeightInSpan, columnHeights[c]);
-      }
-
-      if (maxHeightInSpan < minHeight) {
-        minHeight = maxHeightInSpan;
-        bestCol = col;
-      }
-    }
-
-    const col = bestCol;
-    const row = minHeight;
-
-    // Check if item fits in grid
-    if (row + size.height <= gridRows) {
-      placed.push({
-        id: item.id,
-        width: size.width,
-        height: size.height,
-        row: row,
-        col: col,
-        importance: item.importance,
-        contentCapped: size.contentCapped,
-      });
-
-      // Mark cells as occupied
-      for (let r = row; r < row + size.height; r++) {
-        for (let c = col; c < col + size.width; c++) {
-          if (r < gridRows && c < gridCols) {
-            occupied[r][c] = true;
-          }
-        }
-      }
-
-      // Update column heights
-      for (let c = bestCol; c < bestCol + size.width; c++) {
-        columnHeights[c] = row + size.height;
-      }
-    } else {
-      unplaced.push(item.id);
-    }
-  }
-
-  // PHASE 2: Gap-filling
-  const unplacedItems = unplaced
-    .map((id) => placementOrder.find((item) => item.id === id))
-    .filter((item): item is (typeof placementOrder)[0] => item !== undefined);
-
-  unplacedItems.sort((a, b) => {
-    const sizeA = calculateCardSizeFromPercentile(a, gridCols, gridRows, a.percentile);
-    const sizeB = calculateCardSizeFromPercentile(b, gridCols, gridRows, b.percentile);
-    if (!sizeA) return 1;
-    if (!sizeB) return -1;
-    return sizeA.width * sizeA.height - sizeB.width * sizeB.height;
-  });
-
-  const stillUnplaced: string[] = [];
-  for (const item of unplacedItems) {
-    if (item.format?.strict) {
-      stillUnplaced.push(item.id);
-      continue;
-    }
-
-    let size = calculateCardSizeFromPercentile(
-      item,
-      gridCols,
-      gridRows,
-      Math.max(0, item.percentile - 0.3),
-    );
-
-    let attempts = 0;
-    let placedCard = false;
-    while (size && attempts < 3) {
-      const position = findAvailablePosition(occupied, size.width, size.height, gridCols, gridRows);
-
-      if (position) {
-        placed.push({
-          id: item.id,
-          width: size.width,
-          height: size.height,
-          row: position.row,
-          col: position.col,
-          importance: item.importance,
-          contentCapped: size.contentCapped,
-        });
-
-        for (let r = position.row; r < position.row + size.height; r++) {
-          for (let c = position.col; c < position.col + size.width; c++) {
-            if (r < gridRows && c < gridCols) {
-              occupied[r][c] = true;
-            }
-          }
-        }
-        placedCard = true;
-        break;
-      }
-
-      attempts++;
-      if (attempts === 1 && !item.format?.ratio) {
-        size = { width: 4, height: 4 };
-      } else if (attempts === 2 && !item.format?.ratio) {
-        size = { width: 4, height: 2 };
-      } else {
-        break;
-      }
-    }
-
-    if (!placedCard) {
-      stillUnplaced.push(item.id);
-    }
-  }
-
-  // Find maximum row used
-  let maxRowUsed = 0;
-  for (const card of placed) {
-    const cardBottom = card.row + card.height;
-    if (cardBottom > maxRowUsed) {
-      maxRowUsed = cardBottom;
-    }
-  }
-
+  // Calculate actual grid height and utilization
+  const maxRowUsed = placed.reduce((max, card) => Math.max(max, card.row + card.height), 0);
   const viewportRowsInUnits = viewportRowsInCells * 4;
   const actualGridRowsInUnits = Math.max(viewportRowsInUnits, maxRowUsed + 8);
 
@@ -567,80 +667,17 @@ export function calculateCardLayout(
     }
   }
 
-  // Calculate utilization
-  const viewportCells = gridCols * viewportRowsInUnits;
   const totalCells = gridCols * actualGridRowsInUnits;
   const usedCellsBeforeExpansion = placed.reduce((sum, card) => sum + card.width * card.height, 0);
   const utilizationBeforeExpansion = totalCells > 0 ? usedCellsBeforeExpansion / totalCells : 0;
 
-  // PHASE 3: Proportional scaling to fill empty space
-  if (utilizationBeforeExpansion < 0.75 && placed.length > 0 && totalCells > 0) {
-    const targetUtilization = 0.8;
-    const scaleFactor = Math.sqrt(targetUtilization / utilizationBeforeExpansion);
-    const cappedScaleFactor = Math.min(scaleFactor, 2.0);
-    const allowContentCappedScaling = utilizationBeforeExpansion < 0.7;
+  // PHASE 3: Scale cards proportionally
+  scaleCards(ctx, utilizationBeforeExpansion, actualGridRowsInUnits);
 
-    for (const card of placed) {
-      const originalItem = items.find((item) => item.id === card.id);
+  // PHASE 4: Expand cards horizontally
+  expandHorizontally(ctx, utilizationBeforeExpansion, actualGridRowsInUnits);
 
-      if (originalItem?.format?.strict || originalItem?.format?.minSize) {
-        continue;
-      }
-
-      if (card.contentCapped && !allowContentCappedScaling) {
-        continue;
-      }
-
-      const newWidth = Math.max(2, Math.round(card.width * cappedScaleFactor));
-      const newHeight = Math.max(2, Math.round(card.height * cappedScaleFactor));
-
-      if (newWidth <= gridCols && newHeight <= actualGridRowsInUnits) {
-        card.width = newWidth;
-        card.height = newHeight;
-      }
-    }
-  }
-
-  // PHASE 4: Horizontal gap-filling
-  const allowContentCappedExpansion = utilizationBeforeExpansion < 0.7;
-
-  for (const card of placed) {
-    const rightCol = card.col + card.width;
-    if (rightCol < gridCols) {
-      let canExpandRight = true;
-      for (let r = card.row; r < card.row + card.height; r++) {
-        for (let c = rightCol; c < gridCols; c++) {
-          if (r >= actualGridRowsInUnits || occupied[r][c]) {
-            canExpandRight = false;
-            break;
-          }
-        }
-        if (!canExpandRight) break;
-      }
-
-      if (canExpandRight) {
-        const originalItem = items.find((item) => item.id === card.id);
-
-        if (originalItem?.format?.strict) {
-          continue;
-        }
-
-        if (card.contentCapped && !allowContentCappedExpansion) {
-          continue;
-        }
-
-        for (let r = card.row; r < card.row + card.height; r++) {
-          for (let c = rightCol; c < gridCols; c++) {
-            occupied[r][c] = true;
-          }
-        }
-
-        card.width = gridCols - card.col;
-      }
-    }
-  }
-
-  // Final utilization
+  // Calculate final utilization
   const finalTotalCells = gridCols * actualGridRowsInUnits;
   const usedCells = placed.reduce((sum, card) => sum + card.width * card.height, 0);
   const utilization = finalTotalCells > 0 ? Math.round((usedCells / finalTotalCells) * 100) : 0;
