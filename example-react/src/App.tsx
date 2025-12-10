@@ -260,10 +260,11 @@ export default function App() {
         cellSize={cellSize}
         gap={gap}
         getItemKey={(item) => item.id}
-        renderCard={(card) => <Card card={card} cellSize={cellSize} gap={gap} />}
         onLayoutChange={handleLayoutChange}
         className="masonry-container"
-      />
+      >
+        {(card) => <Card card={card} cellSize={cellSize} gap={gap} />}
+      </MasonryGrid>
 
       <footer className="footer">
         <p>

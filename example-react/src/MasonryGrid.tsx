@@ -6,38 +6,40 @@ import { motion, LayoutGroup, AnimatePresence } from "framer-motion";
 export interface MasonryGridProps<T extends LayoutItem> {
   /** Items to layout */
   items: T[];
+  /** Render function for each card - receives placed card data */
+  children: (card: PlacedCard<T>, index: number) => ReactNode;
+  /** Unique key extractor for items */
+  getItemKey: (item: T) => string;
   /** Base cell size in pixels (default: 200) */
   cellSize?: number;
   /** Gap between items in pixels (default: 16) */
   gap?: number;
-  /** Render function for each card */
-  renderCard: (card: PlacedCard<T>, index: number) => ReactNode;
-  /** Unique key extractor for items */
-  getItemKey: (item: T) => string;
   /** Callback when layout changes */
   onLayoutChange?: (result: LayoutResult<T>) => void;
   /** CSS class for the container */
   className?: string;
 }
 
-export interface MasonryGridStats {
-  cols: number;
-  rows: number;
-  utilization: number;
-  orderFidelity: number;
-  calculationTime: number;
-  cardCount: number;
-}
-
 /**
- * Reusable masonry grid component with Framer Motion animations
+ * Reusable masonry grid component with Framer Motion animations.
+ *
+ * @example
+ * ```tsx
+ * <MasonryGrid items={items} getItemKey={(item) => item.id}>
+ *   {(card) => (
+ *     <div style={{ background: card.item.color }}>
+ *       {card.item.title}
+ *     </div>
+ *   )}
+ * </MasonryGrid>
+ * ```
  */
 export function MasonryGrid<T extends LayoutItem>({
   items,
+  children,
+  getItemKey,
   cellSize = 200,
   gap = 16,
-  renderCard,
-  getItemKey,
   onLayoutChange,
   className,
 }: MasonryGridProps<T>) {
@@ -103,7 +105,7 @@ export function MasonryGrid<T extends LayoutItem>({
                   gridColumn: `span ${card.grid!.colSpan}`,
                 }}
               >
-                {renderCard(card, index)}
+                {children(card, index)}
               </motion.div>
             ))}
           </AnimatePresence>
