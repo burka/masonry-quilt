@@ -301,4 +301,4 @@ MIT
 
 ## Contributing
 
-Contributions welcome! This library was extracted from the [mdnotes](https://github.com/yourusername/mdnotes) project's masonry layout implementation.
+Contributions welcome! This library was extracted from a private project's masonry layout implementation.
