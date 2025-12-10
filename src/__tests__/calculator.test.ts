@@ -451,4 +451,46 @@ describe("calculateCardLayout", () => {
       expect(result1.placed[0].id).toBe(result2.placed[0].id);
     });
   });
+
+  describe("Performance", () => {
+    const generateItems = (count: number): LayoutItem[] =>
+      Array.from({ length: count }, (_, i) => ({
+        id: `item-${i}`,
+        importance: Math.random() * 10,
+        content: i % 3 === 0 ? "Short" : i % 3 === 1 ? "Medium length content here" : "Long content ".repeat(20),
+      }));
+
+    test("handles 100 items efficiently", () => {
+      const items = generateItems(100);
+      const start = performance.now();
+      const result = calculateCardLayout(items, 2000, 4000, 200, "m");
+      const duration = performance.now() - start;
+
+      expect(result.placed.length).toBeGreaterThan(0);
+      expect(result.placed.length + result.unplaced.length).toBe(100);
+      console.log(`100 items: ${duration.toFixed(2)}ms`);
+    });
+
+    test("handles 1000 items efficiently", () => {
+      const items = generateItems(1000);
+      const start = performance.now();
+      const result = calculateCardLayout(items, 4000, 10000, 200, "m");
+      const duration = performance.now() - start;
+
+      expect(result.placed.length).toBeGreaterThan(0);
+      expect(result.placed.length + result.unplaced.length).toBe(1000);
+      console.log(`1000 items: ${duration.toFixed(2)}ms`);
+    });
+
+    test("handles 10000 items efficiently", () => {
+      const items = generateItems(10000);
+      const start = performance.now();
+      const result = calculateCardLayout(items, 8000, 50000, 200, "m");
+      const duration = performance.now() - start;
+
+      expect(result.placed.length).toBeGreaterThan(0);
+      expect(result.placed.length + result.unplaced.length).toBe(10000);
+      console.log(`10000 items: ${duration.toFixed(2)}ms`);
+    });
+  });
 });

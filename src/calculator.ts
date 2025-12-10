@@ -403,13 +403,13 @@ function placeItemsInColumns(
  */
 function fillGaps(
   unplacedIds: string[],
-  placementOrder: ItemWithPercentile[],
+  placementOrderById: Map<string, ItemWithPercentile>,
   ctx: LayoutContext,
 ): string[] {
   const { gridCols, gridRows, occupied, placed } = ctx;
 
   const unplacedItems = unplacedIds
-    .map((id) => placementOrder.find((item) => item.id === id))
+    .map((id) => placementOrderById.get(id))
     .filter((item): item is ItemWithPercentile => item !== undefined);
 
   unplacedItems.sort((a, b) => {
@@ -647,12 +647,13 @@ export function calculateCardLayout(
   const placed: PlacedCard[] = [];
   const occupied: boolean[][] = Array.from({ length: gridRows }, () => Array(gridCols).fill(false));
   const ctx: LayoutContext = { gridCols, gridRows, occupied, placed, itemById };
+  const placementOrderById = new Map(placementOrder.map((item) => [item.id, item]));
 
   // PHASE 1: Place items in columns
   const unplacedIds = placeItemsInColumns(placementOrder, ctx);
 
   // PHASE 2: Fill gaps with unplaced items
-  const stillUnplaced = fillGaps(unplacedIds, placementOrder, ctx);
+  const stillUnplaced = fillGaps(unplacedIds, placementOrderById, ctx);
 
   // Calculate actual grid height and utilization
   const maxRowUsed = placed.reduce((max, card) => Math.max(max, card.row + card.height), 0);
