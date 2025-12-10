@@ -10,8 +10,17 @@ export interface LayoutItem {
     minSize?: { width: number; height: number };
     /** Maximum size in pixels */
     maxSize?: { width: number; height: number };
-    /** Aspect ratio: "16:9", "4:3", "portrait", "landscape", "banner", "tower" */
-    ratio?: string;
+    /** Aspect ratio: "16:9", "4:3", "21:9", "1:1", "portrait", "landscape", "banner", "tower" or custom format */
+    ratio?:
+      | "16:9"
+      | "4:3"
+      | "21:9"
+      | "1:1"
+      | "portrait"
+      | "landscape"
+      | "banner"
+      | "tower"
+      | (string & {});
     /** Allow ratio flexibility (default: false, shortcuts default: true) */
     loose?: boolean;
   };
