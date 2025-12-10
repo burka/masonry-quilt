@@ -371,8 +371,8 @@ describe("calculateLayout", () => {
 
       // Verify items are in original order
       for (let i = 0; i < result.cards.length - 1; i++) {
-        const currentId = parseInt(result.cards[i].item.id);
-        const nextId = parseInt(result.cards[i + 1].item.id);
+        const currentId = parseInt(result.cards[i].item.id, 10);
+        const nextId = parseInt(result.cards[i + 1].item.id, 10);
         expect(nextId).toBeGreaterThan(currentId);
       }
     });
@@ -614,7 +614,6 @@ describe("calculateLayout", () => {
 
       expect(result.cards).toHaveLength(10);
       // All items should have roughly similar sizes (default sizing)
-      const firstSize = result.cards[0].width * result.cards[0].height;
       result.cards.forEach((card) => {
         expect(card.width).toBeGreaterThan(0);
         expect(card.height).toBeGreaterThan(0);

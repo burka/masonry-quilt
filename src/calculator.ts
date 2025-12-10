@@ -44,7 +44,7 @@ function calculateCardSize<T extends LayoutItem>(
     if (parts.length === 2) {
       const ratioW = parseInt(parts[0], 10);
       const ratioH = parseInt(parts[1], 10);
-      if (!isNaN(ratioW) && !isNaN(ratioH) && ratioW > 0 && ratioH > 0) {
+      if (!Number.isNaN(ratioW) && !Number.isNaN(ratioH) && ratioW > 0 && ratioH > 0) {
         const currentRatio = width / height;
         const targetRatio = ratioW / ratioH;
 
