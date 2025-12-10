@@ -336,7 +336,7 @@ cleanup();
 
 ## Performance
 
-- **10,000 items in ~80ms**
+- **10,000 items in ~60ms**
 - **Deterministic** — Same input always produces same output
 - **No DOM** — Pure calculation, runs anywhere
 
