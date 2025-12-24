@@ -4,6 +4,8 @@ A pure TypeScript masonry layout calculator — **items in, pixel positions out*
 
 Give it items in your preferred order, get back pixel coordinates ready to render. No DOM, no UI framework dependencies. Works anywhere JavaScript runs.
 
+**[Live Demo](https://burka.github.io/masonry-quilt/)**
+
 ## Features
 
 - **Order-preserving** — Items placed in your input order
