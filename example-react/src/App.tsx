@@ -175,45 +175,85 @@ export default function App() {
   return (
     <div className="app">
       <header className="header">
-        <h1>
-          <a
-            href="https://www.npmjs.com/package/masonry-quilt"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{ color: 'inherit', textDecoration: 'none' }}
-          >
-            🧩 masonry-quilt
-          </a>
-          {' '}React Example
-        </h1>
-        <p className="subtitle" style={{ marginBottom: '0.5em' }}>
+        <h1>🧩 masonry-quilt</h1>
+        <p className="subtitle">
           A pure TypeScript masonry layout calculator — items in, pixel positions out.
         </p>
-        <p className="subtitle">
-          Resize the window to see smooth Framer Motion animations!
-        </p>
-        <div style={{ marginTop: '0.75em', fontSize: '0.9em' }}>
-          <a
-            href="https://github.com/burka/masonry-quilt"
-            target="_blank"
-            rel="noopener noreferrer"
-            style={{
-              color: 'white',
-              textDecoration: 'none',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: '0.3em'
-            }}
-            onMouseOver={(e) => e.currentTarget.style.textDecoration = 'underline'}
-            onMouseOut={(e) => e.currentTarget.style.textDecoration = 'none'}
-          >
-            <svg height="16" width="16" viewBox="0 0 16 16" fill="currentColor" aria-label="GitHub">
-              <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path>
-            </svg>
-            GitHub
-          </a>
-        </div>
       </header>
+
+      {/* Info Panel */}
+      <div className="settings-panel" style={{ marginBottom: '20px' }}>
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '24px', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div style={{ flex: '1 1 300px', minWidth: '280px' }}>
+            <h3 style={{ marginBottom: '12px', color: '#333' }}>Quick Start</h3>
+            <pre style={{
+              background: '#1e1e1e',
+              color: '#d4d4d4',
+              padding: '12px',
+              borderRadius: '8px',
+              fontSize: '13px',
+              overflow: 'auto',
+              margin: 0
+            }}>{`npm install masonry-quilt
+
+import { calculateLayout } from "masonry-quilt";
+
+const result = calculateLayout(items, width, height);
+// result.cards[].x, .y, .width, .height`}</pre>
+          </div>
+          <div style={{ flex: '0 0 auto' }}>
+            <h3 style={{ marginBottom: '12px', color: '#333' }}>Links</h3>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+              <a
+                href="https://github.com/burka/masonry-quilt"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '8px 16px',
+                  background: '#24292e',
+                  color: 'white',
+                  borderRadius: '6px',
+                  textDecoration: 'none',
+                  fontWeight: 500
+                }}
+              >
+                <svg height="18" width="18" viewBox="0 0 16 16" fill="currentColor">
+                  <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.013 8.013 0 0016 8c0-4.42-3.58-8-8-8z"></path>
+                </svg>
+                GitHub Repo
+              </a>
+              <a
+                href="https://www.npmjs.com/package/masonry-quilt"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{
+                  display: 'inline-flex',
+                  alignItems: 'center',
+                  gap: '8px',
+                  padding: '8px 16px',
+                  background: '#cb3837',
+                  color: 'white',
+                  borderRadius: '6px',
+                  textDecoration: 'none',
+                  fontWeight: 500
+                }}
+              >
+                <svg height="18" width="18" viewBox="0 0 256 256" fill="currentColor">
+                  <path d="M0 256V0h256v256H0z" fill="#cb3837"/>
+                  <path d="M48 48v160h80v-32h48V48H48zm64 128V80h32v96h-32z" fill="white"/>
+                </svg>
+                npm Package
+              </a>
+            </div>
+          </div>
+        </div>
+        <p style={{ marginTop: '16px', color: '#666', fontSize: '14px' }}>
+          Zero dependencies. Works anywhere JS runs. Resize this window to see the layout adapt!
+        </p>
+      </div>
 
       {/* Settings Panel */}
       <div className="settings-panel">
