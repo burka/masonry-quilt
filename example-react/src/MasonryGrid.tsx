@@ -3,6 +3,11 @@ import { calculateLayout, createResizeObserver } from "masonry-quilt";
 import type { LayoutItem, PlacedCard, LayoutResult } from "masonry-quilt";
 import { motion, LayoutGroup, AnimatePresence } from "framer-motion";
 
+/** Extended layout result with calculation time */
+export interface LayoutResultWithTiming<T extends LayoutItem> extends LayoutResult<T> {
+  calculationTime: number;
+}
+
 export interface MasonryGridProps<T extends LayoutItem> {
   /** Items to layout */
   items: T[];
@@ -15,7 +20,7 @@ export interface MasonryGridProps<T extends LayoutItem> {
   /** Gap between items in pixels (default: 16) */
   gap?: number;
   /** Callback when layout changes */
-  onLayoutChange?: (result: LayoutResult<T>) => void;
+  onLayoutChange?: (result: LayoutResultWithTiming<T>) => void;
   /** CSS class for the container */
   className?: string;
 }
@@ -51,11 +56,13 @@ export function MasonryGrid<T extends LayoutItem>({
     if (!containerRef.current) return;
 
     const performLayout = (width: number, height: number) => {
+      const startTime = performance.now();
       const result = calculateLayout(items, width, height, {
         baseSize: cellSize,
         gap: gap,
         includeGrid: true,
       });
+      const endTime = performance.now();
 
       setLayout(result.cards);
 
@@ -63,7 +70,8 @@ export function MasonryGrid<T extends LayoutItem>({
       const rows = Math.round(result.height / cellSize);
       setGridDimensions({ cols, rows });
 
-      onLayoutChange?.(result);
+      // Add calculation time to result before passing to callback
+      onLayoutChange?.({ ...result, calculationTime: endTime - startTime } as LayoutResultWithTiming<T>);
     };
 
     // Initial calculation

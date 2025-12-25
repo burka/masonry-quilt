@@ -108,11 +108,21 @@ export const showcaseCards: ShowcaseCard[] = [
   {
     id: 'control-card-count',
     type: 'control-slider',
-    label: 'Demo Cards',
+    label: '+ Extra Cards',
     settingKey: 'cardCount',
-    min: 5,
+    min: 0,
     max: 200,
     step: 5,
+    format: { ratio: 'landscape' },
+  },
+  {
+    id: 'control-border-radius',
+    type: 'control-slider',
+    label: 'Border Radius',
+    settingKey: 'borderRadius',
+    min: 0,
+    max: 32,
+    step: 2,
     format: { ratio: 'landscape' },
   },
   {

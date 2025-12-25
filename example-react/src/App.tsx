@@ -1,6 +1,6 @@
 import { useState, useCallback, useMemo } from "react";
-import type { PlacedCard, LayoutResult } from "masonry-quilt";
-import { MasonryGrid } from "./MasonryGrid";
+import type { PlacedCard } from "masonry-quilt";
+import { MasonryGrid, type LayoutResultWithTiming } from "./MasonryGrid";
 import { ThemeProvider, useTheme } from "./theme";
 import {
   type ShowcaseCard,
@@ -28,12 +28,14 @@ function CardRenderer({
   settings,
   onSettingChange,
   gap,
+  borderRadius,
 }: {
   card: PlacedCard<ShowcaseCard>;
   metrics: LayoutMetrics;
-  settings: { cellSize: number; gap: number; cardCount: number; selectedRatios: string[] };
+  settings: { cellSize: number; gap: number; cardCount: number; borderRadius: number; selectedRatios: string[] };
   onSettingChange: (key: string, value: number | string[]) => void;
   gap: number;
+  borderRadius: number;
 }) {
   const { theme, toggleTheme } = useTheme();
   const { colSpan = 1, rowSpan = 1 } = card.grid || {};
@@ -91,7 +93,7 @@ function CardRenderer({
       return <LinkCard card={card.item} />;
 
     case "demo-item":
-      return <DemoItemCard card={card.item} colSpan={colSpan} rowSpan={rowSpan} gap={gap} />;
+      return <DemoItemCard card={card.item} colSpan={colSpan} rowSpan={rowSpan} gap={gap} borderRadius={borderRadius} />;
 
     default:
       return null;
@@ -103,6 +105,7 @@ function AppContent() {
   const [cellSize, setCellSize] = useState(150);
   const [gap, setGap] = useState(12);
   const [cardCount, setCardCount] = useState(30);
+  const [borderRadius, setBorderRadius] = useState(16);
   const [selectedRatios, setSelectedRatios] = useState<string[]>([]);
 
   // Layout metrics
@@ -115,7 +118,7 @@ function AppContent() {
     cardCount: 0,
   });
 
-  const settings = { cellSize, gap, cardCount, selectedRatios };
+  const settings = { cellSize, gap, cardCount, borderRadius, selectedRatios };
 
   const handleSettingChange = useCallback((key: string, value: number | string[]) => {
     switch (key) {
@@ -127,6 +130,9 @@ function AppContent() {
         break;
       case "cardCount":
         setCardCount(value as number);
+        break;
+      case "borderRadius":
+        setBorderRadius(value as number);
         break;
       case "selectedRatios":
         setSelectedRatios(value as string[]);
@@ -153,13 +159,13 @@ function AppContent() {
 
   // Handle layout changes
   const handleLayoutChange = useCallback(
-    (result: LayoutResult<ShowcaseCard>) => {
+    (result: LayoutResultWithTiming<ShowcaseCard>) => {
       setMetrics({
         cols: Math.round(result.width / cellSize),
         rows: Math.round(result.height / cellSize),
         utilization: result.utilization,
         orderFidelity: result.orderFidelity,
-        calculationTime: 0,
+        calculationTime: result.calculationTime,
         cardCount: result.cards.length,
       });
     },
@@ -183,6 +189,7 @@ function AppContent() {
             settings={settings}
             onSettingChange={handleSettingChange}
             gap={gap}
+            borderRadius={borderRadius}
           />
         )}
       </MasonryGrid>

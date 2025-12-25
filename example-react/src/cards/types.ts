@@ -54,7 +54,7 @@ export interface FeatureCard extends BaseCard {
 export interface SliderControlCard extends BaseCard {
   type: "control-slider";
   label: string;
-  settingKey: "cellSize" | "gap" | "cardCount";
+  settingKey: "cellSize" | "gap" | "cardCount" | "borderRadius";
   min: number;
   max: number;
   step: number;

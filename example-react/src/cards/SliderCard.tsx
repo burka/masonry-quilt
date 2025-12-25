@@ -2,7 +2,7 @@ interface SliderControlCard {
   type: 'control-slider';
   id: string;
   label: string;
-  settingKey: 'cellSize' | 'gap' | 'cardCount';
+  settingKey: 'cellSize' | 'gap' | 'cardCount' | 'borderRadius';
   min: number;
   max: number;
   step: number;
@@ -42,7 +42,7 @@ export function SliderCard({ card, value, onChange }: Props) {
           fontSize: '18px',
           fontFamily: "'JetBrains Mono', monospace"
         }}>
-          {value}{card.settingKey === 'cardCount' ? '' : 'px'}
+          {value}{card.settingKey === 'cardCount' ? '' : card.settingKey === 'borderRadius' ? 'px' : 'px'}
         </span>
       </div>
       <input
