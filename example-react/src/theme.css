@@ -1,0 +1,96 @@
+/* Theme CSS Variables - Vibrant and Powerful */
+
+:root {
+  /* Light theme - VIBRANT and BOLD */
+  --bg-primary: #f0f4ff;
+  --bg-secondary: #ffffff;
+  --bg-card: #ffffff;
+  --text-primary: #1a1a2e;
+  --text-secondary: #4a4a68;
+
+  /* Accent colors - Saturated and powerful */
+  --accent-1: #FF3366;  /* Hot pink */
+  --accent-2: #00D9FF;  /* Electric cyan */
+  --accent-3: #FFD600;  /* Vibrant yellow */
+  --accent-4: #00FF88;  /* Neon green */
+  --accent-5: #9D4EDD;  /* Electric purple */
+  --accent-6: #FF6B00;  /* Vivid orange */
+
+  /* Backgrounds and effects */
+  --gradient-bg: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  --shadow-color: rgba(0, 0, 0, 0.15);
+  --border-radius: 16px;
+
+  /* Panel and surface colors */
+  --panel-bg: rgba(255, 255, 255, 0.95);
+  --panel-shadow: 0 8px 32px rgba(0, 0, 0, 0.2);
+  --stat-bg: rgba(255, 255, 255, 0.2);
+  --stat-backdrop: blur(10px);
+
+  /* Interactive elements */
+  --button-border: #ddd;
+  --button-hover: #667eea;
+  --button-active-bg: #667eea;
+  --slider-bg: #ddd;
+  --slider-thumb: #667eea;
+
+  /* Card specific */
+  --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  --card-hover-shadow: 0 8px 24px rgba(0, 0, 0, 0.25);
+}
+
+[data-theme="dark"] {
+  /* Dark theme - NEON and ELECTRIC */
+  --bg-primary: #0a0a1a;
+  --bg-secondary: #141428;
+  --bg-card: #1a1a2e;
+  --text-primary: #ffffff;
+  --text-secondary: #b0b0cc;
+
+  /* Accent colors - Neon and glowing */
+  --accent-1: #FF4D7D;  /* Neon pink */
+  --accent-2: #00E5FF;  /* Electric cyan */
+  --accent-3: #FFE500;  /* Bright yellow */
+  --accent-4: #00FF99;  /* Neon green */
+  --accent-5: #B366FF;  /* Electric purple */
+  --accent-6: #FF8533;  /* Vivid orange */
+
+  /* Backgrounds and effects */
+  --gradient-bg: linear-gradient(135deg, #1a1a2e 0%, #2d1b4e 100%);
+  --shadow-color: rgba(0, 0, 0, 0.5);
+  --border-radius: 16px;
+
+  /* Panel and surface colors */
+  --panel-bg: rgba(26, 26, 46, 0.95);
+  --panel-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
+  --stat-bg: rgba(255, 255, 255, 0.1);
+  --stat-backdrop: blur(10px);
+
+  /* Interactive elements */
+  --button-border: #3a3a5a;
+  --button-hover: #B366FF;
+  --button-active-bg: #B366FF;
+  --slider-bg: #3a3a5a;
+  --slider-thumb: #B366FF;
+
+  /* Card specific */
+  --card-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --card-hover-shadow: 0 8px 24px rgba(0, 0, 0, 0.6);
+}
+
+/* Smooth theme transitions */
+body {
+  background: var(--gradient-bg);
+  color: var(--text-primary);
+  transition: background 0.3s ease, color 0.3s ease;
+}
+
+/* Card accent colors array for dynamic assignment */
+:root {
+  --color-0: var(--accent-1);
+  --color-1: var(--accent-2);
+  --color-2: var(--accent-3);
+  --color-3: var(--accent-4);
+  --color-4: var(--accent-5);
+  --color-5: var(--accent-6);
+}
