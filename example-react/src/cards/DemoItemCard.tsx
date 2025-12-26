@@ -9,11 +9,9 @@ interface Props {
   card: DemoItemCard;
   colSpan: number;
   rowSpan: number;
-  gap: number;
-  borderRadius: number;
 }
 
-export function DemoItemCard({ card, colSpan, rowSpan, borderRadius }: Props) {
+export function DemoItemCard({ card, colSpan, rowSpan }: Props) {
   const area = colSpan * rowSpan;
   let fontSize = 24;
   if (area >= 16) fontSize = 48;
@@ -31,8 +29,7 @@ export function DemoItemCard({ card, colSpan, rowSpan, borderRadius }: Props) {
       justifyContent: 'center',
       gap: '8px',
       color: 'white',
-      height: '100%',
-      borderRadius: `${borderRadius}px`
+      height: '100%'
     }}>
       <span style={{ fontSize: `${fontSize}px` }}>{card.emoji}</span>
       <span style={{

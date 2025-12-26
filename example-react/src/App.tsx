@@ -27,15 +27,11 @@ function CardRenderer({
   metrics,
   settings,
   onSettingChange,
-  gap,
-  borderRadius,
 }: {
   card: PlacedCard<ShowcaseCard>;
   metrics: LayoutMetrics;
   settings: { cellSize: number; gap: number; cardCount: number; borderRadius: number; selectedRatios: string[] };
   onSettingChange: (key: string, value: number | string[]) => void;
-  gap: number;
-  borderRadius: number;
 }) {
   const { theme, toggleTheme } = useTheme();
   const { colSpan = 1, rowSpan = 1 } = card.grid || {};
@@ -93,7 +89,7 @@ function CardRenderer({
       return <LinkCard card={card.item} />;
 
     case "demo-item":
-      return <DemoItemCard card={card.item} colSpan={colSpan} rowSpan={rowSpan} gap={gap} borderRadius={borderRadius} />;
+      return <DemoItemCard card={card.item} colSpan={colSpan} rowSpan={rowSpan} />;
 
     default:
       return null;
@@ -173,7 +169,7 @@ function AppContent() {
   );
 
   return (
-    <div className="app pure-masonry">
+    <div className="app pure-masonry" style={{ '--border-radius': `${borderRadius}px` } as React.CSSProperties}>
       <MasonryGrid
         items={allItems}
         cellSize={cellSize}
@@ -188,8 +184,6 @@ function AppContent() {
             metrics={metrics}
             settings={settings}
             onSettingChange={handleSettingChange}
-            gap={gap}
-            borderRadius={borderRadius}
           />
         )}
       </MasonryGrid>
