@@ -895,4 +895,224 @@ describe("calculateLayout", () => {
       expect(result.cards[0].grid).toBeDefined();
     });
   });
+
+  describe("Strict ratio readjustment", () => {
+    test("strict tall ratio re-stretches height to honor the ratio", () => {
+      // A tiny size collapses the card toward the 2x2 minimum during ratio
+      // calculation; with a strict tall ratio the height must be re-derived
+      // from the (clamped) width so the final aspect ratio is honored.
+      const items: TestItem[] = [
+        { id: "tall", format: { ratio: "1:5", loose: false, size: { width: 50, height: 50 } } },
+      ];
+      const result = calculateLayout(items, 2000, 2000, { baseSize: 200, gap: 16 });
+
+      const card = result.cards.find((c) => c.item.id === "tall");
+      expect(card).toBeDefined();
+      // Width snaps to the 2-unit minimum (100px); height is re-stretched to 5x.
+      expect(card?.width).toBe(100);
+      expect(card?.height).toBe(500);
+      expect((card?.height ?? 0) / (card?.width ?? 1)).toBeCloseTo(5, 1);
+    });
+
+    test("strict wide ratio re-stretches width to honor the ratio", () => {
+      // Counterpart to the tall case: exercises the width branch of the
+      // strict-ratio readjustment.
+      const items: TestItem[] = [{ id: "wide", format: { ratio: "2:1", loose: false } }];
+      const result = calculateLayout(items, 2000, 2000, { baseSize: 200, gap: 16 });
+
+      const card = result.cards.find((c) => c.item.id === "wide");
+      expect(card).toBeDefined();
+      expect((card?.width ?? 0) / (card?.height ?? 1)).toBeCloseTo(2, 0.3);
+    });
+  });
+
+  describe("Oversized strict-ratio items are dropped", () => {
+    test("a strict ratio that cannot fit the grid is omitted from the result", () => {
+      // gridCols = floor(400 / 216) = 1 cell => 4 internal units. A 16:9 card
+      // is 11 internal units wide and, being a non-loose explicit ratio, is not
+      // allowed to scale down, so it cannot be placed and is dropped.
+      const items: TestItem[] = [{ id: "strict", format: { ratio: "16:9" } }, { id: "normal" }];
+      const result = calculateLayout(items, 400, 400, { baseSize: 200, gap: 16 });
+
+      const ids = result.cards.map((c) => c.item.id);
+      expect(ids).toContain("normal");
+      expect(ids).not.toContain("strict");
+      expect(result.cards).toHaveLength(1);
+    });
+
+    test("multiple unplaceable strict-ratio items are all dropped", () => {
+      // Two non-loose oversized ratio items both produce a null size and reach
+      // the gap-filling sort comparator with null sizes on both sides.
+      const items: TestItem[] = [
+        { id: "a", format: { ratio: "16:9", size: { width: 5000, height: 5000 } } },
+        { id: "b", format: { ratio: "4:3", size: { width: 5000, height: 5000 } } },
+        { id: "keep" },
+      ];
+      const result = calculateLayout(items, 400, 400, { baseSize: 200, gap: 16 });
+
+      const ids = result.cards.map((c) => c.item.id);
+      expect(ids).toEqual(["keep"]);
+    });
+  });
+
+  describe("Shortcut ratios scale down to fit a small grid", () => {
+    test("an oversized 'tower' shortcut is scaled down rather than dropped", () => {
+      // 'tower' is implicitly loose, so when an inflated size pushes it past the
+      // grid bounds it is scaled down to fit instead of being discarded.
+      const items: TestItem[] = [
+        { id: "tower", format: { ratio: "tower", size: { width: 5000, height: 5000 } } },
+        { id: "filler" },
+      ];
+      const result = calculateLayout(items, 900, 700, { baseSize: 200, gap: 16 });
+
+      const card = result.cards.find((c) => c.item.id === "tower");
+      expect(card).toBeDefined();
+      // Must fit inside the grid bounds it was scaled into.
+      expect(card?.width).toBeLessThanOrEqual(result.width);
+      expect(card?.height).toBeLessThanOrEqual(result.height);
+      // Taller than wide, as a tower should be.
+      expect(card?.height).toBeGreaterThan(card?.width ?? 0);
+    });
+  });
+
+  describe("Gap filling places overflow items into leftover space", () => {
+    test("loose items that overflow column packing are shrunk into gaps", () => {
+      // Full-width 4-cell items stack until the grid overflows; the overflow
+      // items are loose and size-only, so gap filling shrinks them to a 1-cell
+      // (4 internal unit) square and slots them into the empty rows below.
+      const items: TestItem[] = Array.from({ length: 8 }, (_, i) => ({
+        id: `${i}`,
+        format: { size: { width: 800, height: 800 } },
+      }));
+      const result = calculateLayout(items, 900, 100, { baseSize: 200, gap: 16 });
+
+      // Every item is placed (gap filling never drops loose items).
+      expect(result.cards).toHaveLength(8);
+      const ids = result.cards.map((c) => c.item.id).sort();
+      expect(ids).toEqual(["0", "1", "2", "3", "4", "5", "6", "7"]);
+
+      // The shrunk gap-filled cards are a single cell (200px) wide, much smaller
+      // than the 800px full-size cards placed during column packing.
+      const shrunk = result.cards.filter((c) => c.width === 200 && c.height === 200);
+      expect(shrunk.length).toBeGreaterThanOrEqual(1);
+
+      // No two placed cards overlap.
+      for (let i = 0; i < result.cards.length; i++) {
+        for (let j = i + 1; j < result.cards.length; j++) {
+          const a = result.cards[i];
+          const b = result.cards[j];
+          const disjoint =
+            a.x + a.width <= b.x ||
+            b.x + b.width <= a.x ||
+            a.y + a.height <= b.y ||
+            b.y + b.height <= a.y;
+          expect(disjoint).toBe(true);
+        }
+      }
+    });
+  });
+
+  describe("Grid grows after placement when a card reaches the bottom edge", () => {
+    test("a single full-height item triggers post-placement grid growth", () => {
+      // gridRows = max(viewportRows*3, ceil(estimate*1.5)) * 4 = 20 internal
+      // units for one item in this viewport. A 1000px-tall card is exactly 20
+      // units, landing on the bottom edge and forcing the occupied grid to grow.
+      const items: TestItem[] = [{ id: "full", format: { minSize: { width: 400, height: 1000 } } }];
+      const result = calculateLayout(items, 900, 100, { baseSize: 200, gap: 16 });
+
+      const card = result.cards.find((c) => c.item.id === "full");
+      expect(card).toBeDefined();
+      expect(card?.height).toBe(1000);
+      expect(card?.width).toBeGreaterThanOrEqual(400);
+      // Output height must have grown to contain the tall card.
+      expect(result.height).toBeGreaterThanOrEqual(1000);
+    });
+  });
+
+  describe("Ratio sort comparator with mixed placeable and unplaceable items", () => {
+    test("a leading null-size item sorts behind valid overflow items", () => {
+      // An oversized non-loose ratio item (null size) comes first, followed by
+      // many loose full-width items that overflow the grid (valid sizes). V8
+      // invokes the sort comparator as compare(arr[i], arr[i-1]), so the first
+      // comparison has a valid left operand and the null-size right operand,
+      // exercising the `!sizeB` branch of the comparator.
+      const overflow: TestItem[] = Array.from({ length: 50 }, (_, i) => ({
+        id: `ov-${i}`,
+        format: { size: { width: 800, height: 800 } },
+      }));
+      const items: TestItem[] = [
+        { id: "null-head", format: { ratio: "16:9", size: { width: 6000, height: 6000 } } },
+        ...overflow,
+      ];
+      const result = calculateLayout(items, 900, 100, { baseSize: 200, gap: 16 });
+
+      const ids = result.cards.map((c) => c.item.id);
+      // The oversized strict-ratio item is dropped; every loose item survives.
+      expect(ids).not.toContain("null-head");
+      expect(result.cards).toHaveLength(50);
+      for (let i = 0; i < 50; i++) {
+        expect(ids).toContain(`ov-${i}`);
+      }
+    });
+  });
+
+  describe("Malformed custom ratio strings", () => {
+    test("ratio without a colon is ignored and the item keeps its default size", () => {
+      const items: TestItem[] = [{ id: "bad", format: { ratio: "totally-not-a-ratio" } }];
+      const result = calculateLayout(items, 2000, 2000, { baseSize: 200, gap: 16 });
+
+      const bad = result.cards.find((c) => c.item.id === "bad");
+      expect(bad).toBeDefined();
+      // The malformed ratio is skipped, so the card stays at the default
+      // 2x2-cell size (8 internal units => 400px at baseSize 200). Having a
+      // `format.ratio` also means the card is not scaled/expanded.
+      expect(bad?.width).toBe(400);
+      expect(bad?.height).toBe(400);
+    });
+
+    test("ratio with non-numeric or zero parts is ignored", () => {
+      const items: TestItem[] = [
+        { id: "nan", format: { ratio: "abc:def" } },
+        { id: "zero", format: { ratio: "0:0" } },
+      ];
+      const result = calculateLayout(items, 2000, 2000, { baseSize: 200, gap: 16 });
+
+      const nan = result.cards.find((c) => c.item.id === "nan");
+      const zero = result.cards.find((c) => c.item.id === "zero");
+      // Both invalid ratios are skipped, leaving the default 400px card.
+      expect(nan?.width).toBe(400);
+      expect(nan?.height).toBe(400);
+      expect(zero?.width).toBe(400);
+      expect(zero?.height).toBe(400);
+    });
+  });
+
+  describe("Grow path does not overlap previously grown cards (regression)", () => {
+    test("multiple non-loose items routed through grid growth never overlap", () => {
+      // Tall non-loose minSize items cannot be shrunk into gaps, so several of
+      // them overflow column packing and fall through to the grid-growth path.
+      // A stale gridRows snapshot used to stack them all on the same row.
+      const items: TestItem[] = Array.from({ length: 12 }, (_, i) => ({
+        id: `${i}`,
+        format: { minSize: { width: 700, height: 1000 }, loose: false },
+      }));
+      const result = calculateLayout(items, 900, 100, { baseSize: 200, gap: 16 });
+
+      expect(result.cards).toHaveLength(12);
+
+      // Assert no two placed cards overlap.
+      for (let i = 0; i < result.cards.length; i++) {
+        for (let j = i + 1; j < result.cards.length; j++) {
+          const a = result.cards[i];
+          const b = result.cards[j];
+          const disjoint =
+            a.x + a.width <= b.x ||
+            b.x + b.width <= a.x ||
+            a.y + a.height <= b.y ||
+            b.y + b.height <= a.y;
+          expect(disjoint).toBe(true);
+        }
+      }
+    });
+  });
 });
