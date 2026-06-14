@@ -30,8 +30,7 @@ function calculateCardSize<T extends LayoutItem>(
 
   // Handle format ratio constraints
   if (item.format?.ratio) {
-    const ratios = Array.isArray(item.format.ratio) ? item.format.ratio : [item.format.ratio];
-    const firstRatio = ratios[0];
+    const firstRatio = item.format.ratio;
     const resolvedRatio = RATIO_SHORTCUTS[firstRatio] || firstRatio;
     const isLoose = RATIO_SHORTCUTS[firstRatio] !== undefined || item.format.loose === true;
 
@@ -93,12 +92,10 @@ function calculateCardSize<T extends LayoutItem>(
       const scaleY = gridRows / height;
       const scale = Math.min(scaleX, scaleY);
 
+      // scale is the min of the per-axis fit factors, so flooring both
+      // dimensions always lands within the grid bounds.
       width = Math.max(1, Math.floor(width * scale));
       height = Math.max(1, Math.floor(height * scale));
-
-      if (width > gridCols || height > gridRows) {
-        return null;
-      }
     } else {
       return null;
     }
@@ -188,11 +185,14 @@ function markRegion(
   maxRows: number,
   maxCols: number,
 ): void {
-  for (let r = row; r < row + height; r++) {
-    for (let c = col; c < col + width; c++) {
-      if (r < maxRows && c < maxCols) {
-        grid[r][c] = true;
-      }
+  // Clamp to the grid bounds so a region that runs past the edge can never
+  // write out of range (callers are expected to stay in bounds; this is a
+  // defensive guard).
+  const rowEnd = Math.min(row + height, maxRows);
+  const colEnd = Math.min(col + width, maxCols);
+  for (let r = row; r < rowEnd; r++) {
+    for (let c = col; c < colEnd; c++) {
+      grid[r][c] = true;
     }
   }
 }
@@ -269,26 +269,35 @@ function fillGaps<T extends LayoutItem>(
   ctx: LayoutContext<T>,
   baseSize: number,
 ): void {
-  const { gridCols, gridRows, occupied, placed } = ctx;
+  // NOTE: ctx.gridRows can grow during this phase, so always read it live
+  // rather than snapshotting it — using a stale value places later grow-path
+  // items on top of earlier ones and corrupts the available-space search.
+  const { gridCols, occupied, placed } = ctx;
 
   const unplacedItems = unplacedIndices.map((i) => indexedItems[i]);
 
   // Sort by size (smaller first) to fit into gaps
   unplacedItems.sort((a, b) => {
-    const sizeA = calculateCardSize(a.item, baseSize, gridCols, gridRows);
-    const sizeB = calculateCardSize(b.item, baseSize, gridCols, gridRows);
+    const sizeA = calculateCardSize(a.item, baseSize, gridCols, ctx.gridRows);
+    const sizeB = calculateCardSize(b.item, baseSize, gridCols, ctx.gridRows);
     if (!sizeA) return 1;
     if (!sizeB) return -1;
     return sizeA.width * sizeA.height - sizeB.width * sizeB.height;
   });
 
   for (const { item, originalIndex } of unplacedItems) {
-    let size = calculateCardSize(item, baseSize, gridCols, gridRows);
+    let size = calculateCardSize(item, baseSize, gridCols, ctx.gridRows);
     let attempts = 0;
     let placedCard = false;
 
     while (size && attempts < 3) {
-      const position = findAvailablePosition(occupied, size.width, size.height, gridCols, gridRows);
+      const position = findAvailablePosition(
+        occupied,
+        size.width,
+        size.height,
+        gridCols,
+        ctx.gridRows,
+      );
 
       if (position) {
         placed.push({
@@ -306,7 +315,7 @@ function fillGaps<T extends LayoutItem>(
           position.col,
           size.width,
           size.height,
-          gridRows,
+          ctx.gridRows,
           gridCols,
         );
         placedCard = true;
@@ -326,9 +335,9 @@ function fillGaps<T extends LayoutItem>(
 
     // If still not placed, grow grid and place it
     if (!placedCard && size) {
-      // Find a position at the bottom of the grid
+      // Find a position at the bottom of the (current, possibly grown) grid
       const col = 0;
-      const row = gridRows;
+      const row = ctx.gridRows;
 
       // Grow the grid
       const additionalRows = size.height + 8; // Add some padding
@@ -502,9 +511,11 @@ export function calculateLayout<T extends LayoutItem>(
     ctx.gridRows = actualGridRowsInUnits;
   }
 
+  // totalCells is always positive here: the unusable-viewport guard above
+  // guarantees gridCols >= 4 and actualGridRowsInUnits >= 8.
   const totalCells = gridCols * actualGridRowsInUnits;
   const usedCellsBeforeExpansion = placed.reduce((sum, card) => sum + card.width * card.height, 0);
-  const utilizationBeforeExpansion = totalCells > 0 ? usedCellsBeforeExpansion / totalCells : 0;
+  const utilizationBeforeExpansion = usedCellsBeforeExpansion / totalCells;
 
   // PHASE 3: Scale cards proportionally
   scaleCards(ctx, utilizationBeforeExpansion, actualGridRowsInUnits);
@@ -512,10 +523,9 @@ export function calculateLayout<T extends LayoutItem>(
   // PHASE 4: Expand cards horizontally
   expandHorizontally(ctx, utilizationBeforeExpansion, actualGridRowsInUnits);
 
-  // Calculate final utilization
-  const finalTotalCells = gridCols * actualGridRowsInUnits;
+  // Calculate final utilization (totalCells unchanged by scaling/expansion phases)
   const usedCells = placed.reduce((sum, card) => sum + card.width * card.height, 0);
-  const utilization = finalTotalCells > 0 ? usedCells / finalTotalCells : 0;
+  const utilization = usedCells / totalCells;
 
   // Calculate order fidelity
   let maxActualDisplacement = 0;

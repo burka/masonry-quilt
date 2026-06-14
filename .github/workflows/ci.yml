@@ -33,7 +33,7 @@ jobs:
         run: npm run build
 
       - name: Test with Coverage
-        run: npm run test -- --coverage --coverage.thresholds.lines=90 --coverage.thresholds.branches=85 --coverage.thresholds.functions=100 --coverage.thresholds.statements=90
+        run: npm run test -- --coverage --coverage.thresholds.lines=100 --coverage.thresholds.branches=100 --coverage.thresholds.functions=100 --coverage.thresholds.statements=100
 
   publish:
     needs: test
