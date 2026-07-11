@@ -1115,4 +1115,473 @@ describe("calculateLayout", () => {
       }
     });
   });
+
+  describe("exact skyline mode", () => {
+    function assertNoOverlap(cards: { x: number; y: number; width: number; height: number }[]) {
+      for (let i = 0; i < cards.length; i++) {
+        for (let j = i + 1; j < cards.length; j++) {
+          const a = cards[i];
+          const b = cards[j];
+          const disjoint =
+            a.x + a.width <= b.x ||
+            b.x + b.width <= a.x ||
+            a.y + a.height <= b.y ||
+            b.y + b.height <= a.y;
+          expect(disjoint).toBe(true);
+        }
+      }
+    }
+
+    test("pixel-exact: exact input sizes come back unrounded", () => {
+      const items: TestItem[] = [
+        { id: "a", format: { size: { width: 160, height: 226 } } },
+        { id: "b", format: { size: { width: 328, height: 226 } } },
+        { id: "c", format: { size: { width: 504, height: 452 } } },
+      ];
+      const result = calculateLayout(items, 1200, 800, { packing: "exact", gap: 0 });
+
+      const byId = Object.fromEntries(result.cards.map((c) => [c.item.id, c]));
+      expect(byId.a.width).toBe(160);
+      expect(byId.a.height).toBe(226);
+      expect(byId.b.width).toBe(328);
+      expect(byId.b.height).toBe(226);
+      expect(byId.c.width).toBe(504);
+      expect(byId.c.height).toBe(452);
+    });
+
+    test("no overlap across a mixed set of ~30 boxes", () => {
+      const sizes = [
+        { width: 120, height: 80 },
+        { width: 200, height: 150 },
+        { width: 90, height: 240 },
+        { width: 310, height: 60 },
+        { width: 175, height: 175 },
+      ];
+      const items: TestItem[] = Array.from({ length: 30 }, (_, i) => ({
+        id: `${i}`,
+        format: { size: sizes[i % sizes.length] },
+      }));
+      const result = calculateLayout(items, 1000, 800, { packing: "exact", gap: 8 });
+
+      expect(result.cards).toHaveLength(30);
+      assertNoOverlap(result.cards);
+    });
+
+    test("respects targetWidth: no card exceeds the container's right edge", () => {
+      const sizes = [
+        { width: 150, height: 100 },
+        { width: 260, height: 220 },
+        { width: 90, height: 300 },
+      ];
+      const items: TestItem[] = Array.from({ length: 20 }, (_, i) => ({
+        id: `${i}`,
+        format: { size: sizes[i % sizes.length] },
+      }));
+      const result = calculateLayout(items, 700, 500, { packing: "exact", gap: 10 });
+
+      for (const card of result.cards) {
+        expect(card.x + card.width).toBeLessThanOrEqual(result.width);
+        // None of these boxes are wider than the container, so none may overflow it.
+        expect(card.x + card.width).toBeLessThanOrEqual(700);
+      }
+    });
+
+    test("oversized item overflows the right edge instead of being dropped", () => {
+      const items: TestItem[] = [{ id: "huge", format: { size: { width: 5000, height: 300 } } }];
+      const result = calculateLayout(items, 700, 500, { packing: "exact", gap: 0 });
+
+      expect(result.cards).toHaveLength(1);
+      expect(result.cards[0].x).toBe(0);
+      expect(result.cards[0].width).toBe(5000);
+      expect(result.width).toBeGreaterThanOrEqual(5000);
+    });
+
+    test("degenerate targetWidth (0) never overlaps cards at the origin", () => {
+      // A transient container width of 0 (e.g. measured before
+      // ResizeObserver fires) must never collapse the raise range and stack
+      // every card on top of each other at {x:0, y:0}.
+      const items: TestItem[] = [
+        { id: "a", format: { size: { width: 100, height: 100 } } },
+        { id: "b", format: { size: { width: 100, height: 200 } } },
+        { id: "c", format: { size: { width: 100, height: 300 } } },
+      ];
+      const result = calculateLayout(items, 0, 500, { packing: "exact" });
+
+      expect(result.cards).toEqual([]);
+      expect(result.width).toBe(0);
+      expect(result.height).toBe(0);
+      expect(result.utilization).toBe(0);
+      expect(result.orderFidelity).toBe(1);
+    });
+
+    test("degenerate targetWidth (negative or non-finite) is treated the same as 0", () => {
+      const items: TestItem[] = [{ id: "a", format: { size: { width: 100, height: 100 } } }];
+
+      for (const badWidth of [-50, Number.NaN, Number.POSITIVE_INFINITY]) {
+        const result = calculateLayout(items, badWidth, 500, { packing: "exact" });
+        expect(result.cards).toEqual([]);
+      }
+    });
+
+    test("normal small layout with gap:0 still packs with zero overlaps", () => {
+      const items: TestItem[] = [
+        { id: "a", format: { size: { width: 100, height: 100 } } },
+        { id: "b", format: { size: { width: 100, height: 200 } } },
+        { id: "c", format: { size: { width: 100, height: 300 } } },
+      ];
+      const result = calculateLayout(items, 500, 500, { packing: "exact", gap: 0 });
+
+      expect(result.cards).toHaveLength(3);
+      assertNoOverlap(result.cards);
+    });
+
+    test("items whose every variant has zero/negative width or height are skipped safely", () => {
+      const items: TestItem[] = [
+        { id: "good-before", format: { size: { width: 100, height: 100 } } },
+        { id: "degenerate", format: { size: { width: 0, height: 100 } } },
+        { id: "also-degenerate", format: { variants: [{ width: 50, height: 0 }] } },
+        { id: "good-after", format: { size: { width: 100, height: 100 } } },
+      ];
+      const result = calculateLayout(items, 500, 500, { packing: "exact", gap: 0 });
+
+      expect(result.cards.map((c) => c.item.id)).toEqual(["good-before", "good-after"]);
+      assertNoOverlap(result.cards);
+    });
+
+    test("valley filling: a later item rises beside a short box instead of stacking below the tall one", () => {
+      const items: TestItem[] = [
+        { id: "tall", format: { size: { width: 200, height: 800 } } },
+        { id: "short", format: { size: { width: 200, height: 100 } } },
+        { id: "filler", format: { size: { width: 200, height: 200 } } },
+      ];
+      const result = calculateLayout(items, 400, 100, { packing: "exact", gap: 0 });
+
+      const byId = Object.fromEntries(result.cards.map((c) => [c.item.id, c]));
+      // The tall box occupies the left column down to y=800.
+      expect(byId.tall.x).toBe(0);
+      expect(byId.tall.y).toBe(0);
+      expect(byId.tall.height).toBe(800);
+      // The short box sits beside it, not below it.
+      expect(byId.short.x).toBe(200);
+      expect(byId.short.y).toBe(0);
+      // The filler rises into the valley above "short" rather than being
+      // pushed below "tall" (which a naive row-based layout would do).
+      expect(byId.filler.x).toBe(200);
+      expect(byId.filler.y).toBeLessThan(byId.tall.y + byId.tall.height);
+      assertNoOverlap(result.cards);
+    });
+
+    test("variants: the candidate yielding the smaller restY/top wins", () => {
+      // Pre-fill the skyline so the left 168px column is high (500) and the
+      // remaining 512px is low (100) - a valley on the right.
+      const items: TestItem[] = [
+        { id: "pre-left", format: { size: { width: 168, height: 500 } } },
+        { id: "pre-right", format: { size: { width: 512, height: 100 } } },
+        {
+          id: "variant-item",
+          format: {
+            variants: [
+              { width: 504, height: 226 }, // wide
+              { width: 168, height: 680 }, // tall
+            ],
+          },
+        },
+      ];
+      const result = calculateLayout(items, 680, 100, { packing: "exact", gap: 0 });
+
+      const byId = Object.fromEntries(result.cards.map((c) => [c.item.id, c]));
+      expect(byId["pre-left"]).toMatchObject({ x: 0, y: 0, width: 168, height: 500 });
+      expect(byId["pre-right"]).toMatchObject({ x: 168, y: 0, width: 512, height: 100 });
+      // Both variants can reach restY=100 at x=168, but the wide variant has
+      // the smaller resulting top (100+226 < 100+680), so it wins the tie.
+      expect(byId["variant-item"]).toMatchObject({ x: 168, y: 100, width: 504, height: 226 });
+    });
+
+    test("determinism: identical input produces a deeply equal result", () => {
+      const items: TestItem[] = Array.from({ length: 15 }, (_, i) => ({
+        id: `${i}`,
+        format: { size: { width: 100 + (i % 5) * 40, height: 90 + (i % 3) * 60 } },
+      }));
+
+      const result1 = calculateLayout(items, 800, 600, { packing: "exact", gap: 12 });
+      const result2 = calculateLayout(items, 800, 600, { packing: "exact", gap: 12 });
+
+      expect(result2).toEqual(result1);
+    });
+
+    test("order stability: output cards preserve input order", () => {
+      const items: TestItem[] = Array.from({ length: 25 }, (_, i) => ({
+        id: `${i}`,
+        format: { size: { width: 80 + (i % 4) * 30, height: 80 + (i % 5) * 20 } },
+      }));
+      const result = calculateLayout(items, 900, 700, { packing: "exact", gap: 6 });
+
+      expect(result.cards.map((c) => c.item.id)).toEqual(items.map((i) => i.id));
+    });
+
+    test("grid-mode regression: omitting packing (or 'grid') is byte-for-byte unchanged", () => {
+      const items: TestItem[] = [
+        { id: "a", format: { size: { width: 400, height: 400 } } },
+        { id: "b" },
+        { id: "c", format: { ratio: "16:9" } },
+      ];
+      const expected = {
+        cards: [
+          {
+            item: { id: "a", format: { size: { width: 400, height: 400 } } },
+            x: 0,
+            y: 0,
+            width: 400,
+            height: 400,
+          },
+          { item: { id: "b" }, x: 432, y: 0, width: 500, height: 500 },
+          {
+            item: { id: "c", format: { ratio: "16:9" } },
+            x: 0,
+            y: 432,
+            width: 550,
+            height: 300,
+          },
+        ],
+        width: 932,
+        height: 732,
+        utilization: 0.6534090909090909,
+        orderFidelity: 1,
+      };
+
+      const withoutOption = calculateLayout(items, 900, 600, { baseSize: 200, gap: 16 });
+      const withGridOption = calculateLayout(items, 900, 600, {
+        baseSize: 200,
+        gap: 16,
+        packing: "grid",
+      });
+
+      expect(withoutOption).toEqual(expected);
+      expect(withGridOption).toEqual(expected);
+    });
+
+    test("perf sanity: 2000 boxes of MANY distinct sizes pack in near-linear time", () => {
+      // Regression for an O(n^3) blow-up: per-item placement used to
+      // re-filter the *entire* skyline for every candidate x0, which is only
+      // cheap when the skyline coalesces down to a handful of segments (as
+      // it does when sizes repeat). Here every item has a distinct width and
+      // a distinct height, so the skyline stays fragmented into many
+      // segments and never coalesces - this is the case that used to take
+      // over a minute at N=4000.
+      const items: TestItem[] = Array.from({ length: 2000 }, (_, i) => ({
+        id: `${i}`,
+        format: {
+          size: { width: 20 + ((i * 7) % 300), height: 20 + ((i * 13) % 500) },
+        },
+      }));
+
+      const start = performance.now();
+      const result = calculateLayout(items, 4000, 4000, { packing: "exact", gap: 4 });
+      const elapsed = performance.now() - start;
+
+      expect(result.cards).toHaveLength(2000);
+      // Count overlaps without calling `expect()` per pair (~2M pairs at
+      // N=2000) - the assertion machinery itself would dwarf the packer's
+      // own O(n^2) cost and produce a false timeout unrelated to the fix.
+      let overlaps = 0;
+      const cards = result.cards;
+      for (let i = 0; i < cards.length; i++) {
+        for (let j = i + 1; j < cards.length; j++) {
+          const a = cards[i];
+          const b = cards[j];
+          const disjoint =
+            a.x + a.width <= b.x ||
+            b.x + b.width <= a.x ||
+            a.y + a.height <= b.y ||
+            b.y + b.height <= a.y;
+          if (!disjoint) overlaps++;
+        }
+      }
+      expect(overlaps).toBe(0);
+      // Loose bound: just proves there is no cubic blow-up (the old
+      // implementation took multiple seconds at this N).
+      expect(elapsed).toBeLessThan(300);
+    });
+
+    /** Count overlapping pairs among placed cards without asserting per-pair (O(n^2), assert once). */
+    function countOverlaps(
+      cards: { x: number; y: number; width: number; height: number }[],
+    ): number {
+      let overlaps = 0;
+      for (let i = 0; i < cards.length; i++) {
+        for (let j = i + 1; j < cards.length; j++) {
+          const a = cards[i];
+          const b = cards[j];
+          const disjoint =
+            a.x + a.width <= b.x ||
+            b.x + b.width <= a.x ||
+            a.y + a.height <= b.y ||
+            b.y + b.height <= a.y;
+          if (!disjoint) overlaps++;
+        }
+      }
+      return overlaps;
+    }
+
+    test("regression: 2382 boxes of many distinct sizes never overlap (bisected minimal repro)", () => {
+      // Adversarial bisection found that raiseSkyline used to overwrite a
+      // segment's recorded height unconditionally when raising the range
+      // covering a placed box's footprint + gap buffer. When that buffer
+      // landed inside an already-taller neighboring segment, the neighbor's
+      // height got corrupted (lowered), and a later item read the bogus
+      // height and was placed overlapping the earlier, taller card - here,
+      // cards '2342' and '2381' ended up overlapping.
+      const items: TestItem[] = Array.from({ length: 2382 }, (_, i) => ({
+        id: String(i),
+        format: { size: { width: 20 + ((i * 7) % 300), height: 20 + ((i * 13) % 500) } },
+      }));
+      const result = calculateLayout(items, 4000, 4000, { packing: "exact", gap: 4 });
+
+      expect(result.cards).toHaveLength(2382);
+      expect(countOverlaps(result.cards)).toBe(0);
+    });
+
+    test("property: zero overlaps and in-bounds cards across many deterministic large datasets", () => {
+      // Each item's size is derived from its index (no Math.random) so this
+      // is fully reproducible; the (a, b, W, H, gap, targetWidth, N)
+      // combinations are chosen to fragment the skyline differently (small
+      // vs. large gaps, narrow vs. wide containers, prime vs. non-prime
+      // strides) to stress the raise-range/gap-buffer interaction that
+      // caused the original bug.
+      const configs: {
+        n: number;
+        a: number;
+        b: number;
+        w: number;
+        h: number;
+        gap: number;
+        targetWidth: number;
+      }[] = [
+        { n: 500, a: 7, b: 13, w: 300, h: 500, gap: 4, targetWidth: 4000 },
+        { n: 1200, a: 11, b: 17, w: 250, h: 400, gap: 8, targetWidth: 3000 },
+        { n: 2000, a: 5, b: 23, w: 400, h: 200, gap: 1, targetWidth: 2500 },
+        { n: 2382, a: 7, b: 13, w: 300, h: 500, gap: 4, targetWidth: 4000 },
+        { n: 3000, a: 13, b: 29, w: 180, h: 900, gap: 0, targetWidth: 5000 },
+        { n: 3000, a: 3, b: 7, w: 600, h: 60, gap: 12, targetWidth: 1500 },
+      ];
+
+      for (const { n, a, b, w, h, gap, targetWidth } of configs) {
+        const items: TestItem[] = Array.from({ length: n }, (_, i) => ({
+          id: String(i),
+          format: { size: { width: 20 + ((i * a) % w), height: 20 + ((i * b) % h) } },
+        }));
+        const result = calculateLayout(items, targetWidth, targetWidth, {
+          packing: "exact",
+          gap,
+        });
+
+        expect(result.cards).toHaveLength(n);
+        expect(countOverlaps(result.cards)).toBe(0);
+        for (const card of result.cards) {
+          expect(card.x).toBeGreaterThanOrEqual(0);
+          expect(card.y).toBeGreaterThanOrEqual(0);
+          expect(card.x + card.width).toBeLessThanOrEqual(result.width);
+          expect(card.y + card.height).toBeLessThanOrEqual(result.height);
+        }
+      }
+    });
+
+    test("variants: identical inputs pick identical variants across runs (determinism)", () => {
+      const items: TestItem[] = [
+        { id: "pre-left", format: { size: { width: 168, height: 500 } } },
+        { id: "pre-right", format: { size: { width: 512, height: 100 } } },
+        {
+          id: "variant-item",
+          format: {
+            variants: [
+              { width: 504, height: 226 }, // wide
+              { width: 168, height: 680 }, // tall
+            ],
+          },
+        },
+      ];
+
+      const result1 = calculateLayout(items, 680, 100, { packing: "exact", gap: 0 });
+      const result2 = calculateLayout(items, 680, 100, { packing: "exact", gap: 0 });
+
+      expect(result2).toEqual(result1);
+      const chosen = result1.cards.find((c) => c.item.id === "variant-item");
+      expect(chosen).toMatchObject({ width: 504, height: 226 });
+    });
+
+    test("exact mode never returns a 'grid' field, even when includeGrid:true is passed", () => {
+      const items: TestItem[] = [
+        { id: "a", format: { size: { width: 100, height: 100 } } },
+        { id: "b", format: { size: { width: 150, height: 80 } } },
+      ];
+      const result = calculateLayout(items, 500, 500, {
+        packing: "exact",
+        gap: 8,
+        includeGrid: true,
+      });
+
+      expect(result.cards).toHaveLength(2);
+      for (const card of result.cards) {
+        expect(card.grid).toBeUndefined();
+      }
+    });
+
+    test("gap: honors real pixel spacing between two adjacent boxes", () => {
+      const items: TestItem[] = [
+        { id: "a", format: { size: { width: 100, height: 100 } } },
+        { id: "b", format: { size: { width: 100, height: 100 } } },
+      ];
+      const result = calculateLayout(items, 220, 200, { packing: "exact", gap: 10 });
+
+      const byId = Object.fromEntries(result.cards.map((c) => [c.item.id, c]));
+      // Both boxes are 100 wide and the container is only 220px, so they sit
+      // side by side with a real 10px gap between their edges.
+      expect(byId.a.y).toBe(0);
+      expect(byId.b.y).toBe(0);
+      expect(byId.b.x - (byId.a.x + byId.a.width)).toBe(10);
+      assertNoOverlap(result.cards);
+    });
+
+    test("orderFidelity is within [0,1] and equals 1 for a trivially-ordered single column", () => {
+      const narrowColumnItems: TestItem[] = Array.from({ length: 5 }, (_, i) => ({
+        id: `${i}`,
+        format: { size: { width: 100, height: 100 + i * 10 } },
+      }));
+      const singleColumn = calculateLayout(narrowColumnItems, 100, 100, {
+        packing: "exact",
+        gap: 5,
+      });
+      expect(singleColumn.orderFidelity).toBe(1);
+
+      const mixedSizeItems: TestItem[] = Array.from({ length: 40 }, (_, i) => ({
+        id: `${i}`,
+        format: { size: { width: 40 + ((i * 17) % 200), height: 40 + ((i * 23) % 300) } },
+      }));
+      const packed = calculateLayout(mixedSizeItems, 900, 700, { packing: "exact", gap: 6 });
+      expect(packed.orderFidelity).toBeGreaterThanOrEqual(0);
+      expect(packed.orderFidelity).toBeLessThanOrEqual(1);
+    });
+
+    test("format.ratio only (no size/variants) falls back to a valid square in exact mode with zero overlaps", () => {
+      const items: TestItem[] = [
+        { id: "a", format: { ratio: "16:9" } },
+        { id: "b", format: { ratio: "portrait" } },
+        { id: "c", format: { ratio: "1:1" } },
+      ];
+      const result = calculateLayout(items, 600, 400, {
+        packing: "exact",
+        gap: 4,
+        baseSize: 150,
+      });
+
+      expect(result.cards).toHaveLength(3);
+      for (const card of result.cards) {
+        // Falls back to the fallback square (baseSize x baseSize) since
+        // exact mode ignores format.ratio entirely.
+        expect(card.width).toBe(150);
+        expect(card.height).toBe(150);
+      }
+      assertNoOverlap(result.cards);
+    });
+  });
 });

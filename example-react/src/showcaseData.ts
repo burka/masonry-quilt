@@ -6,7 +6,61 @@ const QUICK_START_CODE = `npm install masonry-quilt
 import { calculateLayout } from "masonry-quilt";
 
 const result = calculateLayout(items, width, height);
-// result.cards[].x, .y, .width, .height`;
+// result.cards[].x, .y, .width, .height
+
+// Pixel-exact skyline packing:
+calculateLayout(items, width, height, { packing: "exact" });
+// no quantization; honors format.size / format.variants`;
+
+// Grid footprint ([cols, rows]) implied by each supported ratio shortcut -
+// used only to translate 'grid' mode's implicit cell spans into real pixel
+// dimensions when the viewer switches to 'exact' packing mode.
+const RATIO_SPAN: Record<string, [number, number]> = {
+  '1:1': [1, 1],
+  landscape: [2, 1],
+  '16:9': [2, 1],
+  '4:3': [2, 1],
+  '3:2': [2, 1],
+  portrait: [1, 2],
+  banner: [4, 1],
+  '4:1': [4, 1],
+  tower: [1, 4],
+  '1:4': [1, 4],
+};
+
+function spanToPixels(cols: number, rows: number, cellSize: number, gap: number) {
+  return {
+    width: cols * cellSize + (cols - 1) * gap,
+    height: rows * cellSize + (rows - 1) * gap,
+  };
+}
+
+/**
+ * Translate each item's grid-oriented hints (`format.ratio`, `variantSpans`)
+ * into the pixel-exact `format.size` / `format.variants` that 'exact' mode
+ * reads, at the current cellSize/gap. Items without a recognized ratio or
+ * variantSpans are returned unchanged (exact mode falls back to a baseSize
+ * square for those, which is exactly what a plain demo item should get).
+ */
+export function toExactModeItems<T extends { format?: ShowcaseCard['format']; variantSpans?: [number, number][] }>(
+  items: T[],
+  cellSize: number,
+  gap: number,
+): T[] {
+  return items.map((item) => {
+    if (item.variantSpans && item.variantSpans.length > 0) {
+      const variants = item.variantSpans.map(([cols, rows]) => spanToPixels(cols, rows, cellSize, gap));
+      return { ...item, format: { ...item.format, variants } };
+    }
+
+    const ratio = item.format?.ratio;
+    const span = ratio ? RATIO_SPAN[ratio as string] : undefined;
+    if (!span) return item;
+
+    const size = spanToPixels(span[0], span[1], cellSize, gap);
+    return { ...item, format: { ...item.format, size } };
+  });
+}
 
 // Available aspect ratios for filtering
 export const AVAILABLE_RATIOS = [
@@ -40,14 +94,29 @@ const ratios: (DemoItemCardType['format'] | undefined)[] = [
   { ratio: 'portrait', loose: true },
 ];
 
+// Equal-area candidate footprints (wide 2x1 vs tall 1x2) handed to a handful
+// of demo items so exact-mode packing can visibly choose whichever shape
+// fits the current skyline gap tighter.
+const VARIANT_SPANS: [number, number][] = [
+  [2, 1],
+  [1, 2],
+];
+
 export function generateDemoItems(count: number): DemoItemCardType[] {
-  return Array.from({ length: count }, (_, i) => ({
-    id: `demo-${i + 1}`,
-    type: 'demo-item' as const,
-    emoji: emojis[i % emojis.length],
-    color: colors[i % colors.length],
-    format: ratios[i % ratios.length],
-  }));
+  return Array.from({ length: count }, (_, i) => {
+    const isVariantShowcase = i % 7 === 3;
+    return {
+      id: `demo-${i + 1}`,
+      type: 'demo-item' as const,
+      emoji: emojis[i % emojis.length],
+      color: colors[i % colors.length],
+      // Variant-showcase items skip the ratio format entirely - in exact
+      // mode their shape is decided by variantSpans; in grid mode they fall
+      // back to the default square footprint.
+      format: isVariantShowcase ? undefined : ratios[i % ratios.length],
+      variantSpans: isVariantShowcase ? VARIANT_SPANS : undefined,
+    };
+  });
 }
 
 // Static showcase cards (the UI/informational cards)
@@ -130,6 +199,12 @@ export const showcaseCards: ShowcaseCard[] = [
     type: 'control-ratio-filter',
     ratios: AVAILABLE_RATIOS,
     format: { ratio: 'banner' },
+  },
+  {
+    id: 'control-packing-mode',
+    type: 'control-packing',
+    label: 'Packing Mode',
+    format: { ratio: '1:1' },
   },
 
   // Feature cards

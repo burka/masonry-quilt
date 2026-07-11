@@ -438,6 +438,295 @@ function expandHorizontally<T extends LayoutItem>(
   }
 }
 
+/** A horizontal strip of the skyline: occupies [x, x + width) at the given height. */
+interface SkylineSegment {
+  x: number;
+  width: number;
+  height: number;
+}
+
+/** A candidate shape (in real pixels) considered when placing an item in exact mode. */
+interface SizeCandidate {
+  width: number;
+  height: number;
+}
+
+/** Resolve the candidate shapes for an item in 'exact' packing mode. */
+function resolveExactCandidates<T extends LayoutItem>(
+  item: T,
+  fallbackSize: number,
+): SizeCandidate[] {
+  if (item.format?.variants && item.format.variants.length > 0) {
+    return item.format.variants.map((variant) => ({
+      width: variant.width,
+      height: variant.height,
+    }));
+  }
+  if (item.format?.size) {
+    return [{ width: item.format.size.width, height: item.format.size.height }];
+  }
+  return [{ width: fallbackSize, height: fallbackSize }];
+}
+
+/** Segments whose horizontal span overlaps [x0, x0 + width). */
+function segmentsOverlapping(
+  skyline: SkylineSegment[],
+  x0: number,
+  width: number,
+): SkylineSegment[] {
+  const end = x0 + width;
+  return skyline.filter((segment) => segment.x < end && segment.x + segment.width > x0);
+}
+
+/** The lowest y at which a box of the given width can rest at x0 (bottom-left skyline rule). */
+function restingHeightAt(skyline: SkylineSegment[], x0: number, width: number): number {
+  let maxHeight = 0;
+  for (const segment of segmentsOverlapping(skyline, x0, width)) {
+    maxHeight = Math.max(maxHeight, segment.height);
+  }
+  return maxHeight;
+}
+
+/**
+ * For a fixed box width, compute the resting height (bottom-left skyline
+ * rule) at every candidate x0 - each segment's left edge with
+ * x0 + width <= maxX - in a single left-to-right sweep.
+ *
+ * Uses the classic sliding-window-maximum technique (a monotonic deque of
+ * segment indices, indexed by two monotonically advancing pointers) instead
+ * of re-filtering the whole skyline per candidate: O(segments) total for all
+ * candidates of this width, instead of O(segments^2).
+ */
+function restingHeightsForWidth(
+  skyline: SkylineSegment[],
+  width: number,
+  maxX: number,
+): { x0: number; restY: number }[] {
+  const results: { x0: number; restY: number }[] = [];
+  // Deque of segment indices with strictly decreasing height; dq[head] is
+  // always the index of the current window's tallest segment.
+  const dq: number[] = [];
+  let head = 0;
+  let right = 0;
+
+  for (let i = 0; i < skyline.length; i++) {
+    const x0 = skyline[i].x;
+    if (x0 + width > maxX) break;
+    const windowEnd = x0 + width;
+
+    // Admit every segment that starts before the window's right edge.
+    while (right < skyline.length && skyline[right].x < windowEnd) {
+      const h = skyline[right].height;
+      while (dq.length > head && skyline[dq[dq.length - 1]].height <= h) {
+        dq.pop();
+      }
+      dq.push(right);
+      right++;
+    }
+
+    // Evict segments that have scrolled fully out of the window on the left.
+    while (head < dq.length && skyline[dq[head]].x + skyline[dq[head]].width <= x0) {
+      head++;
+    }
+
+    results.push({ x0, restY: head < dq.length ? skyline[dq[head]].height : 0 });
+  }
+
+  return results;
+}
+
+/**
+ * Raise the skyline over [rangeStart, rangeEnd) to newHeight, splitting/merging
+ * segments so the array keeps tiling the full width with ascending x and no
+ * zero-width segments, coalescing adjacent equal-height runs.
+ */
+function raiseSkyline(
+  skyline: SkylineSegment[],
+  rangeStart: number,
+  rangeEnd: number,
+  newHeight: number,
+): SkylineSegment[] {
+  const split: SkylineSegment[] = [];
+
+  for (const segment of skyline) {
+    const segmentEnd = segment.x + segment.width;
+    if (segmentEnd <= rangeStart || segment.x >= rangeEnd) {
+      split.push(segment);
+      continue;
+    }
+    if (segment.x < rangeStart) {
+      split.push({ x: segment.x, width: rangeStart - segment.x, height: segment.height });
+    }
+    const overlapStart = Math.max(segment.x, rangeStart);
+    const overlapEnd = Math.min(segmentEnd, rangeEnd);
+    // A skyline must only ever grow: never lower a segment's recorded height
+    // below what a previously placed box already occupies there, or a later
+    // item can read a corrupted (too-low) height and overlap that box.
+    split.push({
+      x: overlapStart,
+      width: overlapEnd - overlapStart,
+      height: Math.max(segment.height, newHeight),
+    });
+    if (segmentEnd > rangeEnd) {
+      split.push({ x: rangeEnd, width: segmentEnd - rangeEnd, height: segment.height });
+    }
+  }
+
+  const coalesced: SkylineSegment[] = [];
+  for (const segment of split) {
+    if (segment.width <= 0) continue;
+    const last = coalesced[coalesced.length - 1];
+    if (last && last.height === segment.height && last.x + last.width === segment.x) {
+      last.width += segment.width;
+    } else {
+      coalesced.push({ ...segment });
+    }
+  }
+  return coalesced;
+}
+
+/**
+ * Displacement-based order-preservation metric: sort placed entries by their
+ * final position, then compare each entry's position in that sort to its
+ * original input index. Mirrors the metric used by the grid packing path.
+ */
+function calculateOrderFidelity<E>(
+  entries: E[],
+  totalCount: number,
+  originalIndexOf: (entry: E) => number,
+  comparePosition: (a: E, b: E) => number,
+): number {
+  if (totalCount === 0) return 1;
+  const sorted = [...entries].sort(comparePosition);
+  let maxDisplacement = 0;
+  for (let i = 0; i < sorted.length; i++) {
+    maxDisplacement = Math.max(maxDisplacement, Math.abs(i - originalIndexOf(sorted[i])));
+  }
+  return 1 - maxDisplacement / totalCount;
+}
+
+/**
+ * Exact (skyline) packing: order-preserving bottom-left placement in real
+ * pixels, honoring item.format.variants (the best-fitting candidate wins),
+ * with no quantization. O(n * segments) - never a 2D matrix.
+ */
+function packExact<T extends LayoutItem>(
+  items: T[],
+  targetWidth: number,
+  gap: number,
+  baseSize: number,
+): LayoutResult<T> {
+  // Unusable viewport (mirrors the grid path's `gridColsInCells < 1` guard):
+  // a width that is zero, negative, or not finite is a routine transient
+  // (e.g. a container ref measured before ResizeObserver fires) - never
+  // place cards on top of one another because of it. An empty item list is
+  // the same "nothing to place" case.
+  if (!Number.isFinite(targetWidth) || targetWidth <= 0 || items.length === 0) {
+    return {
+      cards: [],
+      width: Math.max(0, targetWidth) || 0,
+      height: 0,
+      utilization: 0,
+      orderFidelity: 1,
+    };
+  }
+
+  const clampedTargetWidth = targetWidth;
+  // Negative gaps are nonsensical for spacing and must never shrink an
+  // item's own occupied footprint - clamp before it can affect placement.
+  const g = Math.max(0, gap);
+  let skyline: SkylineSegment[] = [{ x: 0, width: clampedTargetWidth, height: 0 }];
+  const cards: PlacedCard<T>[] = [];
+
+  for (const item of items) {
+    const rawCandidates = resolveExactCandidates(item, baseSize);
+    // A candidate with zero/negative width or height has no valid footprint;
+    // skip it and fall through to a usable one (or skip the item entirely).
+    const validCandidates = rawCandidates.filter((c) => c.width > 0 && c.height > 0);
+    if (validCandidates.length === 0) {
+      continue;
+    }
+
+    const fitting = validCandidates.filter((candidate) => candidate.width <= clampedTargetWidth);
+    const forcedToOrigin = fitting.length === 0;
+    const usableCandidates = forcedToOrigin
+      ? [validCandidates.reduce((min, c) => (c.width < min.width ? c : min))]
+      : fitting;
+
+    let best: { x: number; y: number; width: number; height: number } | null = null;
+    let bestScore: [number, number, number, number] = [Infinity, Infinity, Infinity, Infinity];
+
+    for (const candidate of usableCandidates) {
+      // Forced-to-origin items (wider than the whole target width) only
+      // ever consider x0 = 0; the sliding-window sweep below assumes every
+      // candidate x0 + width fits within clampedTargetWidth, which does not
+      // hold here, so resolve this single point directly.
+      const candidateResults = forcedToOrigin
+        ? [{ x0: 0, restY: restingHeightAt(skyline, 0, candidate.width) }]
+        : restingHeightsForWidth(skyline, candidate.width, clampedTargetWidth);
+
+      for (const { x0, restY } of candidateResults) {
+        const top = restY + candidate.height;
+        const area = candidate.width * candidate.height;
+        const score: [number, number, number, number] = [restY, top, x0, area];
+
+        const better =
+          score[0] < bestScore[0] ||
+          (score[0] === bestScore[0] &&
+            (score[1] < bestScore[1] ||
+              (score[1] === bestScore[1] &&
+                (score[2] < bestScore[2] ||
+                  (score[2] === bestScore[2] && score[3] < bestScore[3])))));
+
+        if (better) {
+          bestScore = score;
+          best = { x: x0, y: restY, width: candidate.width, height: candidate.height };
+        }
+      }
+    }
+
+    // best is always assigned: usableCandidates and candidateResults are never empty.
+    const placement = best as { x: number; y: number; width: number; height: number };
+    cards.push({
+      item,
+      x: placement.x,
+      y: placement.y,
+      width: placement.width,
+      height: placement.height,
+    });
+
+    // The occupied region raised for this item must always cover at least
+    // its own footprint [x, x + width) - the gap only pushes the *next* box
+    // away and must never shrink occupancy below the box itself (this can
+    // otherwise happen for a forced-to-origin item wider than the target
+    // width, where clamping to clampedTargetWidth would cut the raise short).
+    const raiseStart = placement.x;
+    const footprintEnd = placement.x + placement.width;
+    const raiseEnd = Math.max(footprintEnd, Math.min(footprintEnd + g, clampedTargetWidth));
+    if (raiseEnd > raiseStart) {
+      skyline = raiseSkyline(skyline, raiseStart, raiseEnd, placement.y + placement.height + g);
+    }
+  }
+
+  const maxX = cards.reduce((max, card) => Math.max(max, card.x + card.width), 0);
+  const maxY = cards.reduce((max, card) => Math.max(max, card.y + card.height), 0);
+  const resultWidth = Math.max(clampedTargetWidth, maxX);
+  const resultHeight = maxY;
+
+  const totalArea = resultWidth * resultHeight;
+  const usedArea = cards.reduce((sum, card) => sum + card.width * card.height, 0);
+  const utilization = totalArea > 0 ? usedArea / totalArea : 0;
+
+  const orderFidelity = calculateOrderFidelity(
+    cards.map((card, index) => ({ x: card.x, y: card.y, originalIndex: index })),
+    items.length,
+    (entry) => entry.originalIndex,
+    (a, b) => (a.y !== b.y ? a.y - b.y : a.x - b.x),
+  );
+
+  return { cards, width: resultWidth, height: resultHeight, utilization, orderFidelity };
+}
+
 /**
  * Calculate card layout for given items
  *
@@ -455,6 +744,10 @@ export function calculateLayout<T extends LayoutItem>(
   height: number,
   options?: LayoutOptions,
 ): LayoutResult<T> {
+  if (options?.packing === "exact") {
+    return packExact(items, width, options?.gap ?? 16, options?.baseSize ?? 200);
+  }
+
   const baseSize = options?.baseSize ?? 200;
   const gap = options?.gap ?? 16;
   const includeGrid = options?.includeGrid ?? false;

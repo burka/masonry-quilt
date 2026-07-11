@@ -10,6 +10,7 @@ import {
   StatsCard,
   SliderCard,
   RatioFilterCard,
+  PackingModeCard,
   ThemeToggleCard,
   FeatureCard,
   MetricCard,
@@ -17,7 +18,7 @@ import {
   LinkCard,
   DemoItemCard,
 } from "./cards";
-import { showcaseCards, generateDemoItems } from "./showcaseData";
+import { showcaseCards, generateDemoItems, toExactModeItems } from "./showcaseData";
 import "./App.css";
 import "./theme.css";
 
@@ -30,11 +31,21 @@ function CardRenderer({
 }: {
   card: PlacedCard<ShowcaseCard>;
   metrics: LayoutMetrics;
-  settings: { cellSize: number; gap: number; cardCount: number; borderRadius: number; selectedRatios: string[] };
-  onSettingChange: (key: string, value: number | string[]) => void;
+  settings: {
+    cellSize: number;
+    gap: number;
+    cardCount: number;
+    borderRadius: number;
+    selectedRatios: string[];
+    packingMode: "grid" | "exact";
+  };
+  onSettingChange: (key: string, value: number | string[] | string) => void;
 }) {
   const { theme, toggleTheme } = useTheme();
-  const { colSpan = 1, rowSpan = 1 } = card.grid || {};
+  // Grid mode carries real col/row spans; exact mode has no `grid` field, so
+  // approximate the same "N x M cells" label from the packed pixel size.
+  const colSpan = card.grid?.colSpan ?? Math.max(1, Math.round(card.width / settings.cellSize));
+  const rowSpan = card.grid?.rowSpan ?? Math.max(1, Math.round(card.height / settings.cellSize));
 
   switch (card.item.type) {
     case "hero":
@@ -73,6 +84,15 @@ function CardRenderer({
         />
       );
 
+    case "control-packing":
+      return (
+        <PackingModeCard
+          card={card.item}
+          value={settings.packingMode}
+          onChange={(mode) => onSettingChange("packingMode", mode)}
+        />
+      );
+
     case "theme-toggle":
       return <ThemeToggleCard card={card.item} theme={theme} onToggle={toggleTheme} />;
 
@@ -103,6 +123,7 @@ function AppContent() {
   const [cardCount, setCardCount] = useState(30);
   const [borderRadius, setBorderRadius] = useState(16);
   const [selectedRatios, setSelectedRatios] = useState<string[]>([]);
+  const [packingMode, setPackingMode] = useState<"grid" | "exact">("grid");
 
   // Layout metrics
   const [metrics, setMetrics] = useState<LayoutMetrics>({
@@ -114,9 +135,9 @@ function AppContent() {
     cardCount: 0,
   });
 
-  const settings = { cellSize, gap, cardCount, borderRadius, selectedRatios };
+  const settings = { cellSize, gap, cardCount, borderRadius, selectedRatios, packingMode };
 
-  const handleSettingChange = useCallback((key: string, value: number | string[]) => {
+  const handleSettingChange = useCallback((key: string, value: number | string[] | string) => {
     switch (key) {
       case "cellSize":
         setCellSize(value as number);
@@ -132,6 +153,9 @@ function AppContent() {
         break;
       case "selectedRatios":
         setSelectedRatios(value as string[]);
+        break;
+      case "packingMode":
+        setPackingMode(value as "grid" | "exact");
         break;
     }
   }, []);
@@ -150,8 +174,13 @@ function AppContent() {
     );
 
     // Combine: showcase cards first, then demo items
-    return [...showcaseCards, ...filteredDemoItems];
-  }, [cardCount, selectedRatios]);
+    const combined = [...showcaseCards, ...filteredDemoItems];
+
+    // In 'exact' mode, translate each item's grid-oriented ratio/variantSpans
+    // hints into real pixel format.size/format.variants at the current
+    // cellSize/gap so the skyline packer has meaningful shapes to place.
+    return packingMode === "exact" ? toExactModeItems(combined, cellSize, gap) : combined;
+  }, [cardCount, selectedRatios, packingMode, cellSize, gap]);
 
   // Handle layout changes
   const handleLayoutChange = useCallback(
@@ -174,6 +203,7 @@ function AppContent() {
         items={allItems}
         cellSize={cellSize}
         gap={gap}
+        packing={packingMode}
         getItemKey={(item) => item.id}
         onLayoutChange={handleLayoutChange}
         className="masonry-container"

@@ -4,6 +4,14 @@ import type { LayoutItem } from "masonry-quilt";
 export interface BaseCard extends LayoutItem {
   id: string;
   type: CardType;
+  /**
+   * Demo-only hint (not read by the layout algorithm): alternate [cols, rows]
+   * footprints of equal area. When 'exact' packing mode is active, these are
+   * translated into real-pixel `format.variants` at the current cellSize/gap
+   * so the exact packer visibly picks whichever candidate fits tighter.
+   * Ignored entirely in 'grid' mode.
+   */
+  variantSpans?: [number, number][];
 }
 
 // All possible card types
@@ -15,6 +23,7 @@ export type CardType =
   | "control-slider"
   | "control-toggle"
   | "control-ratio-filter"
+  | "control-packing"
   | "metric"
   | "code"
   | "link"
@@ -73,6 +82,12 @@ export interface RatioFilterCard extends BaseCard {
   ratios: string[];
 }
 
+// Packing mode control card - lets the viewer flip between 'grid' and 'exact'
+export interface PackingControlCard extends BaseCard {
+  type: "control-packing";
+  label: string;
+}
+
 // Metric card - single metric display
 export interface MetricCard extends BaseCard {
   type: "metric";
@@ -125,6 +140,7 @@ export type ShowcaseCard =
   | SliderControlCard
   | ToggleControlCard
   | RatioFilterCard
+  | PackingControlCard
   | MetricCard
   | CodeCard
   | LinkCard
@@ -137,6 +153,7 @@ export interface LayoutSettings {
   gap: number;
   cardCount: number;
   selectedRatios: string[];
+  packingMode: "grid" | "exact";
   theme: "light" | "dark";
 }
 

@@ -23,6 +23,13 @@ export interface LayoutItem {
       | (string & {});
     /** Allow ratio flexibility (default: false, shortcuts default: true) */
     loose?: boolean;
+    /**
+     * Candidate shapes of equal content, in pixels. Only read in `packing: 'exact'`
+     * mode (ignored in the default `'grid'` mode). The packer scores every variant
+     * against the current skyline and picks whichever yields the best fit; the
+     * chosen variant's exact width/height is used verbatim (never quantized).
+     */
+    variants?: { width: number; height: number }[];
   };
 }
 
@@ -79,4 +86,11 @@ export interface LayoutOptions {
   gap?: number;
   /** Include grid positioning data for CSS Grid usage (default: false) */
   includeGrid?: boolean;
+  /**
+   * Packing strategy (default: 'grid').
+   * - 'grid': the current baseSize/4px-quantized occupancy-matrix algorithm.
+   * - 'exact': order-preserving skyline bottom-left packing in exact input
+   *   pixels (no quantization). Reads `format.variants` when present.
+   */
+  packing?: "grid" | "exact";
 }

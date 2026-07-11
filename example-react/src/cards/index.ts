@@ -10,6 +10,7 @@ export { StatsCard } from './StatsCard';
 export { SliderCard } from './SliderCard';
 export { ToggleCard } from './ToggleCard';
 export { RatioFilterCard } from './RatioFilterCard';
+export { PackingModeCard } from './PackingModeCard';
 export { ThemeToggleCard } from './ThemeToggleCard';
 
 // Content cards

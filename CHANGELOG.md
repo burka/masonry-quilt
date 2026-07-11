@@ -7,6 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-07-10
+
+### Added
+
+- **Exact skyline packing mode** (`packing: 'exact'`): an opt-in, order-preserving
+  bottom-left skyline packer that honors each item's `format.size` to the pixel —
+  no cell quantization, no clipping — in `O(n · segments)` time (no 2D occupancy
+  matrix). The default `'grid'` mode is unchanged.
+- **`format.variants`** (`{ width, height }[]`): candidate shapes of equal content;
+  in exact mode the packer chooses whichever fits the current skyline valley
+  tightest.
+- Example app: a Grid/Exact packing-mode toggle and a `format.variants` showcase
+  so the exact packer's shape-picking is visible; quick-start snippet updated.
+
 ### Fixed
 
 - Gap-filling grid growth used a stale row count, causing items routed through
