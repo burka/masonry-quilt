@@ -8,6 +8,47 @@ interface TestItem extends LayoutItem {
 }
 
 describe("calculateLayout", () => {
+  describe("Grid gap consistency", () => {
+    // Every horizontal/vertical distance between two cards that face each
+    // other must be exactly `gap` plus a whole number of quarter-cell strides,
+    // independent of the card size.
+    const cases = [
+      { gap: 8, baseSize: 200, size: { width: 400, height: 400 } },
+      { gap: 16, baseSize: 200, size: { width: 400, height: 200 } },
+      { gap: 24, baseSize: 150, size: { width: 300, height: 450 } },
+    ];
+
+    for (const { gap, baseSize, size } of cases) {
+      test(`space between cards equals gap (gap ${gap}, ${size.width}x${size.height})`, () => {
+        const items: TestItem[] = Array.from({ length: 12 }, (_, i) => ({
+          id: `${i}`,
+          format: { size },
+        }));
+        const result = calculateLayout(items, 1800, 1200, { baseSize, gap });
+        const stride = (baseSize + gap) / 4;
+        const distances: number[] = [];
+
+        for (const a of result.cards) {
+          for (const b of result.cards) {
+            const overlapY = a.y < b.y + b.height && b.y < a.y + a.height;
+            const overlapX = a.x < b.x + b.width && b.x < a.x + a.width;
+            if (overlapY && b.x >= a.x + a.width) distances.push(b.x - (a.x + a.width));
+            if (overlapX && b.y >= a.y + a.height) distances.push(b.y - (a.y + a.height));
+          }
+        }
+
+        expect(distances.length).toBeGreaterThan(0);
+        for (const d of distances) {
+          const steps = (d - gap) / stride;
+          expect(steps).toBeGreaterThanOrEqual(0);
+          expect(steps).toBeCloseTo(Math.round(steps), 6);
+        }
+        // Directly adjacent cards are exactly `gap` apart.
+        expect(Math.min(...distances)).toBeCloseTo(gap, 6);
+      });
+    }
+  });
+
   describe("Grid Calculation (Pixel-based)", () => {
     test("calculates pixel dimensions for 1920x1080 container", () => {
       const items: TestItem[] = [{ id: "1" }];
@@ -666,8 +707,10 @@ describe("calculateLayout", () => {
       const result = calculateLayout(items, 300, 300, { baseSize: 100 });
 
       expect(result.cards).toHaveLength(1);
-      expect(result.cards[0].width).toBeLessThanOrEqual(300);
-      expect(result.cards[0].height).toBeLessThanOrEqual(300);
+      // 2 cells fit the width (2 * 100 + 16 gap = 216px). The portrait card
+      // spans at most 3 cells high (3 * 100 + 2 * 16 gap = 332px).
+      expect(result.cards[0].width).toBeLessThanOrEqual(216);
+      expect(result.cards[0].height).toBeLessThanOrEqual(332);
     });
 
     test("items requiring retry with smaller sizes", () => {
@@ -908,10 +951,11 @@ describe("calculateLayout", () => {
 
       const card = result.cards.find((c) => c.item.id === "tall");
       expect(card).toBeDefined();
-      // Width snaps to the 2-unit minimum (100px); height is re-stretched to 5x.
-      expect(card?.width).toBe(100);
-      expect(card?.height).toBe(500);
-      expect((card?.height ?? 0) / (card?.width ?? 1)).toBeCloseTo(5, 1);
+      // Width snaps to the 2-unit minimum; height is re-stretched to 5x
+      // (10 units). Each unit is a (200 + 16) / 4 = 54px stride and a span
+      // drops one trailing gap: 2 * 54 - 16 = 92px, 10 * 54 - 16 = 524px.
+      expect(card?.width).toBe(92);
+      expect(card?.height).toBe(524);
     });
 
     test("strict wide ratio re-stretches width to honor the ratio", () => {
@@ -1022,7 +1066,8 @@ describe("calculateLayout", () => {
 
       const card = result.cards.find((c) => c.item.id === "full");
       expect(card).toBeDefined();
-      expect(card?.height).toBe(1000);
+      // 20 units = 5 cells + 4 gaps = 1064px (never smaller than minSize).
+      expect(card?.height).toBe(1064);
       expect(card?.width).toBeGreaterThanOrEqual(400);
       // Output height must have grown to contain the tall card.
       expect(result.height).toBeGreaterThanOrEqual(1000);
@@ -1064,10 +1109,10 @@ describe("calculateLayout", () => {
       const bad = result.cards.find((c) => c.item.id === "bad");
       expect(bad).toBeDefined();
       // The malformed ratio is skipped, so the card stays at the default
-      // 2x2-cell size (8 internal units => 400px at baseSize 200). Having a
-      // `format.ratio` also means the card is not scaled/expanded.
-      expect(bad?.width).toBe(400);
-      expect(bad?.height).toBe(400);
+      // 2x2-cell size (8 internal units => 2 * 200 + 16 gap = 416px). Having
+      // a `format.ratio` also means the card is not scaled/expanded.
+      expect(bad?.width).toBe(416);
+      expect(bad?.height).toBe(416);
     });
 
     test("ratio with non-numeric or zero parts is ignored", () => {
@@ -1079,11 +1124,11 @@ describe("calculateLayout", () => {
 
       const nan = result.cards.find((c) => c.item.id === "nan");
       const zero = result.cards.find((c) => c.item.id === "zero");
-      // Both invalid ratios are skipped, leaving the default 400px card.
-      expect(nan?.width).toBe(400);
-      expect(nan?.height).toBe(400);
-      expect(zero?.width).toBe(400);
-      expect(zero?.height).toBe(400);
+      // Both invalid ratios are skipped, leaving the default 2x2-cell card.
+      expect(nan?.width).toBe(416);
+      expect(nan?.height).toBe(416);
+      expect(zero?.width).toBe(416);
+      expect(zero?.height).toBe(416);
     });
   });
 
@@ -1331,20 +1376,20 @@ describe("calculateLayout", () => {
             item: { id: "a", format: { size: { width: 400, height: 400 } } },
             x: 0,
             y: 0,
-            width: 400,
-            height: 400,
+            width: 416,
+            height: 416,
           },
-          { item: { id: "b" }, x: 432, y: 0, width: 500, height: 500 },
+          { item: { id: "b" }, x: 432, y: 0, width: 524, height: 524 },
           {
             item: { id: "c", format: { ratio: "16:9" } },
             x: 0,
             y: 432,
-            width: 550,
-            height: 300,
+            width: 578,
+            height: 308,
           },
         ],
-        width: 932,
-        height: 732,
+        width: 956,
+        height: 740,
         utilization: 0.6534090909090909,
         orderFidelity: 1,
       };

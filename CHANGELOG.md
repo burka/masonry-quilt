@@ -7,6 +7,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-10-01
+
+### Fixed
+
+- **Grid mode gap grew with card size**: positions used a `(baseSize + gap) / 4`
+  stride per quarter-cell, but sizes used `baseSize / 4`, so the space after a
+  card was `units * gap / 4` (e.g. 16px after an 8-unit card with `gap: 8`).
+  Card sizes now use the same stride minus one trailing gap, so the space
+  between adjacent cards is always exactly `gap`. A card spanning N cells is
+  now `N * baseSize + (N - 1) * gap` px (CSS Grid semantics, e.g. the default
+  2x2 card is 416px instead of 400px at `baseSize: 200, gap: 16`). Placement,
+  `grid` data and `utilization` are unchanged.
+
 ## [2.1.0] - 2026-07-10
 
 ### Added

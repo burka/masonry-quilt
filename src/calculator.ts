@@ -835,14 +835,19 @@ export function calculateLayout<T extends LayoutItem>(
 
   const orderFidelity = items.length > 0 ? 1 - maxActualDisplacement / items.length : 1;
 
-  // Convert internal units to pixels
+  // Convert internal units to pixels. Every internal unit is one stride of
+  // (baseSize + gap) / 4 px. A card spanning n units covers n strides minus
+  // one trailing gap, so the space to the next card is always exactly `gap`
+  // (a 1-cell card stays baseSize; a 2-cell card is 2 * baseSize + gap).
+  const stride = (baseSize + gap) / 4;
+  const spanToPx = (units: number) => Math.max(0, units * stride - gap);
   const cards: PlacedCard<T>[] = placed.map((card) => {
     const placedCard: PlacedCard<T> = {
       item: card.item,
-      x: (card.col * (baseSize + gap)) / 4,
-      y: (card.row * (baseSize + gap)) / 4,
-      width: (card.width * baseSize) / 4,
-      height: (card.height * baseSize) / 4,
+      x: card.col * stride,
+      y: card.row * stride,
+      width: spanToPx(card.width),
+      height: spanToPx(card.height),
     };
 
     // Add grid data for CSS Grid usage if requested
