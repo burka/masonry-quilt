@@ -529,7 +529,9 @@ function restingHeightsForWidth(
       head++;
     }
 
-    results.push({ x0, restY: head < dq.length ? skyline[dq[head]].height : 0 });
+    // The window always overlaps segment i itself (width > 0), so the deque
+    // is never empty here.
+    results.push({ x0, restY: skyline[dq[head]].height });
   }
 
   return results;
@@ -539,6 +541,9 @@ function restingHeightsForWidth(
  * Raise the skyline over [rangeStart, rangeEnd) to newHeight, splitting/merging
  * segments so the array keeps tiling the full width with ascending x and no
  * zero-width segments, coalescing adjacent equal-height runs.
+ *
+ * rangeStart must be a segment's left edge (every placement x0 is one), and
+ * rangeEnd > rangeStart, so no left split or zero-width piece can occur.
  */
 function raiseSkyline(
   skyline: SkylineSegment[],
@@ -554,10 +559,7 @@ function raiseSkyline(
       split.push(segment);
       continue;
     }
-    if (segment.x < rangeStart) {
-      split.push({ x: segment.x, width: rangeStart - segment.x, height: segment.height });
-    }
-    const overlapStart = Math.max(segment.x, rangeStart);
+    const overlapStart = segment.x;
     const overlapEnd = Math.min(segmentEnd, rangeEnd);
     // A skyline must only ever grow: never lower a segment's recorded height
     // below what a previously placed box already occupies there, or a later
@@ -574,7 +576,6 @@ function raiseSkyline(
 
   const coalesced: SkylineSegment[] = [];
   for (const segment of split) {
-    if (segment.width <= 0) continue;
     const last = coalesced[coalesced.length - 1];
     if (last && last.height === segment.height && last.x + last.width === segment.x) {
       last.width += segment.width;
@@ -596,7 +597,6 @@ function calculateOrderFidelity<E>(
   originalIndexOf: (entry: E) => number,
   comparePosition: (a: E, b: E) => number,
 ): number {
-  if (totalCount === 0) return 1;
   const sorted = [...entries].sort(comparePosition);
   let maxDisplacement = 0;
   for (let i = 0; i < sorted.length; i++) {
@@ -703,9 +703,7 @@ function packExact<T extends LayoutItem>(
     const raiseStart = placement.x;
     const footprintEnd = placement.x + placement.width;
     const raiseEnd = Math.max(footprintEnd, Math.min(footprintEnd + g, clampedTargetWidth));
-    if (raiseEnd > raiseStart) {
-      skyline = raiseSkyline(skyline, raiseStart, raiseEnd, placement.y + placement.height + g);
-    }
+    skyline = raiseSkyline(skyline, raiseStart, raiseEnd, placement.y + placement.height + g);
   }
 
   const maxX = cards.reduce((max, card) => Math.max(max, card.x + card.width), 0);
