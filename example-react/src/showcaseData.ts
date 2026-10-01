@@ -1,4 +1,5 @@
 import type { ShowcaseCard, DemoItemCard as DemoItemCardType } from './cards/types';
+import { version } from '../../package.json';
 
 // Quick start code snippet
 const QUICK_START_CODE = `npm install masonry-quilt
@@ -127,7 +128,7 @@ export const showcaseCards: ShowcaseCard[] = [
     type: 'hero',
     title: '🧩 masonry-quilt',
     subtitle: 'A pure TypeScript masonry layout calculator — items in, pixel positions out.',
-    version: '2.0.1',
+    version,
     format: { ratio: 'landscape' },
   },
 
