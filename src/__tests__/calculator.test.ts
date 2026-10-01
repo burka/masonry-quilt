@@ -1162,6 +1162,59 @@ describe("calculateLayout", () => {
   });
 
   describe("exact skyline mode", () => {
+    test("forced-to-origin: the narrowest of several too-wide variants is placed at x=0", () => {
+      const items: TestItem[] = [
+        {
+          id: "wide",
+          format: {
+            variants: [
+              { width: 500, height: 100 },
+              { width: 400, height: 120 },
+              { width: 450, height: 80 },
+            ],
+          },
+        },
+      ];
+      const result = calculateLayout(items, 300, 600, { packing: "exact", gap: 0 });
+
+      expect(result.cards).toHaveLength(1);
+      expect(result.cards[0]).toMatchObject({ x: 0, y: 0, width: 400, height: 120 });
+      expect(result.width).toBe(400);
+    });
+
+    test("variants: equal restY, top and x0 fall back to the smaller area", () => {
+      const items: TestItem[] = [
+        {
+          id: "tie",
+          format: {
+            variants: [
+              { width: 200, height: 100 },
+              { width: 150, height: 100 },
+            ],
+          },
+        },
+      ];
+      const result = calculateLayout(items, 600, 600, { packing: "exact", gap: 0 });
+
+      expect(result.cards[0]).toMatchObject({ x: 0, y: 0, width: 150, height: 100 });
+    });
+
+    test("only invalid items: no cards, zero utilization, perfect order fidelity", () => {
+      const items: TestItem[] = [
+        { id: "zero-w", format: { size: { width: 0, height: 100 } } },
+        { id: "neg-h", format: { size: { width: 100, height: -5 } } },
+      ];
+      const result = calculateLayout(items, 600, 600, { packing: "exact" });
+
+      expect(result).toEqual({
+        cards: [],
+        width: 600,
+        height: 0,
+        utilization: 0,
+        orderFidelity: 1,
+      });
+    });
+
     function assertNoOverlap(cards: { x: number; y: number; width: number; height: number }[]) {
       for (let i = 0; i < cards.length; i++) {
         for (let j = i + 1; j < cards.length; j++) {
