@@ -20,6 +20,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   2x2 card is 416px instead of 400px at `baseSize: 200, gap: 16`). Placement,
   `grid` data and `utilization` are unchanged.
 
+### Changed
+
+- Dev dependencies updated (vitest 5, TypeScript 7, tsdown 0.23, Biome 2.5.15);
+  `npm audit` reports 0 vulnerabilities in the library and the demo.
+- Demo updated (framer-motion 13, React 19.3, Vite 8.3); the hero badge now
+  reads the version from `package.json`.
+- CI runs on Node 22 and 24 (Node 20 is end-of-life; the build tooling needs
+  Node >= 22). The library has no runtime dependencies and keeps
+  `engines.node >= 20`.
+- Removed unreachable defensive branches in exact mode and added tests, so
+  coverage is back at 100% (CI enforces it).
+
 ## [2.1.0] - 2026-07-10
 
 ### Added
