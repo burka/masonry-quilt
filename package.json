@@ -1,6 +1,6 @@
 {
   "name": "masonry-quilt",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "A pure TypeScript masonry layout calculator that packs boxes into a given space - no UI, just boxes in and positioning out",
   "type": "module",
   "main": "./dist/index.mjs",

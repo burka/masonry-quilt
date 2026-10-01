@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-10-01
+
 ### Fixed
 
 - **Grid mode gap grew with card size**: positions used a `(baseSize + gap) / 4`
